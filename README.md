@@ -4,13 +4,15 @@ Sistema de reservas para Grupo Cotorreo: Alpadel (canchas de pádel) y Plaza Cot
 
 ## Roles y accesos
 
-| Rol | PIN | Acceso |
-|---|---|---|
-| Cliente | (público, sin PIN) | Reservar mesa o cancha en `/cliente.html` |
-| Gerencia | `0001` (Vicente) / `0002` (Mariela) | Todo + dashboard $$ |
-| Operación (Lili) | `0003` | Reservas, paquetes, recurrentes, cumples, facturación maestros |
-| Maestros | `0004` (Frank) / `0005` (Centro Vital) | Solo sus reservas y facturación |
-| Restaurante | `0006` (saloneros) | Capturar reservas y marcar estados |
+| Rol | Acceso |
+|---|---|
+| Cliente | Público sin PIN, ruta `/cliente.html` |
+| Gerencia | PIN propio, todo + dashboard financiero |
+| Operación | PIN propio, reservas, paquetes, recurrentes, cumples, facturación maestros |
+| Maestros | PIN propio, solo sus reservas y facturación |
+| Restaurante | PIN colectivo para saloneros, capturar reservas y marcar estados |
+
+PINs específicos se configuran en variables de entorno del deploy (ver `.env.example`).
 
 ## Stack
 
