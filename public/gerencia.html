@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Gerencia — Grupo Cotorreo</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="user-info">
+      <div>
+        <h1>📊 Dashboard <span id="userName">Gerencia</span></h1>
+        <div class="subtitle" id="todayText"></div>
+      </div>
+      <button onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="kpis">KPIs</button>
+    <button class="tab" data-tab="top">Top clientes</button>
+    <button class="tab" data-tab="noshows">No-shows</button>
+    <button class="tab" data-tab="operacion">Modo operativo</button>
+  </div>
+
+  <div class="tab-content active" id="tab-kpis">
+    <h3 style="margin:14px 0 6px;">Hoy</h3>
+    <div class="kpi-grid">
+      <div class="kpi green"><div class="label">Ingresos hoy</div><div class="value" id="kpi-hoy-ing">—</div></div>
+      <div class="kpi"><div class="label">Reservas hoy</div><div class="value" id="kpi-hoy-res">—</div></div>
+    </div>
+
+    <h3 style="margin:14px 0 6px;">Este mes</h3>
+    <div class="kpi-grid">
+      <div class="kpi green"><div class="label">Ingresos mes</div><div class="value" id="kpi-mes-ing">—</div></div>
+      <div class="kpi"><div class="label">Reservas mes</div><div class="value" id="kpi-mes-res">—</div></div>
+      <div class="kpi amber"><div class="label">Alpadel</div><div class="value" id="kpi-mes-al">—</div></div>
+      <div class="kpi blue"><div class="label">Cotorreo</div><div class="value" id="kpi-mes-co">—</div></div>
+    </div>
+
+    <h3 style="margin:18px 0 6px;">Comparativo vs mes anterior</h3>
+    <div class="card" id="comparativo">Cargando...</div>
+  </div>
+
+  <div class="tab-content" id="tab-top">
+    <div class="card"><h3>👑 Top 10 clientes por reservas</h3><div id="top-list" class="loading">Cargando</div></div>
+  </div>
+
+  <div class="tab-content" id="tab-noshows">
+    <div class="card"><h3>👻 No-shows del mes</h3><div id="noshows-list" class="loading">Cargando</div></div>
+  </div>
+
+  <div class="tab-content" id="tab-operacion">
+    <div class="card">
+      <h3>Modo operativo</h3>
+      <p>Para gestionar reservas, paquetes, maestros y cumples, abre el panel de Lili (tienes acceso completo).</p>
+      <a href="/lili.html" class="btn btn-primary btn-block" style="margin-top:14px;">Abrir Panel Lili →</a>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+if (!requireRole(["gerencia"])) throw new Error("Sin permiso");
+
+document.getElementById("userName").textContent = getUser().nombre.split(" ")[0];
+document.getElementById("todayText").textContent = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "top") loadTop();
+    if (btn.dataset.tab === "noshows") loadNoshows();
+  });
+});
+
+async function loadKPIs() {
+  try {
+    const k = await api("GET", "/api/dashboard/kpis");
+    document.getElementById("kpi-hoy-ing").textContent = fmtMonto(k.hoy.ingresos);
+    document.getElementById("kpi-hoy-res").textContent = k.hoy.reservas;
+    document.getElementById("kpi-mes-ing").textContent = fmtMonto(k.mes.ingresos);
+    document.getElementById("kpi-mes-res").textContent = k.mes.reservas;
+    document.getElementById("kpi-mes-al").textContent = fmtMonto(k.mes.alpadel.ingresos);
+    document.getElementById("kpi-mes-co").textContent = fmtMonto(k.mes.cotorreo.ingresos);
+
+    const c = await api("GET", "/api/dashboard/comparativo");
+    const arrow = (v) => v === null ? "—" : v > 0 ? `▲ +${v}%` : v < 0 ? `▼ ${v}%` : "= 0%";
+    const color = (v) => v === null ? "" : v >= 0 ? "color:var(--green);" : "color:var(--red);";
+    document.getElementById("comparativo").innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <div class="label">Ingresos</div>
+          <strong>${fmtMonto(c.actual.ingresos)}</strong> vs ${fmtMonto(c.anterior.ingresos)}<br>
+          <span style="${color(c.cambio.ingresos)}; font-weight:700;">${arrow(c.cambio.ingresos)}</span>
+        </div>
+        <div>
+          <div class="label">Reservas</div>
+          <strong>${c.actual.reservas}</strong> vs ${c.anterior.reservas}<br>
+          <span style="${color(c.cambio.reservas)}; font-weight:700;">${arrow(c.cambio.reservas)}</span>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    alert("Error cargando KPIs: " + e.message);
+  }
+}
+
+async function loadTop() {
+  try {
+    const r = await api("GET", "/api/dashboard/top-clientes");
+    if (!r.top.length) {
+      document.getElementById("top-list").innerHTML = "<em>Sin datos</em>";
+      return;
+    }
+    document.getElementById("top-list").innerHTML = r.top.map((c, i) => `
+      <div class="reserva">
+        <div class="reserva-info">
+          <strong>${i+1}. ${c.nombre}</strong><br>
+          <small>${c.totalReservas} reservas (${c.alpadel} cancha + ${c.cotorreo} mesa) · ${c.telefono || ""}</small>
+        </div>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("top-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+async function loadNoshows() {
+  try {
+    const r = await api("GET", "/api/dashboard/no-shows");
+    if (!r.total) {
+      document.getElementById("noshows-list").innerHTML = "<em>✨ Sin no-shows este mes</em>";
+      return;
+    }
+    const al = r.alpadel.map(x => `<div class="reserva estado-noshow"><div class="reserva-info"><strong>${x.cliente}</strong><br><small>🎾 ${fmtFechaCorta(x.fechaHora)} ${fmtHora(x.fechaHora)}</small></div></div>`).join("");
+    const co = r.cotorreo.map(x => `<div class="reserva estado-noshow"><div class="reserva-info"><strong>${x.cliente}</strong><br><small>🍽️ ${fmtFechaCorta(x.fechaHora)} ${fmtHora(x.fechaHora)} · ${x.personas} pax</small></div></div>`).join("");
+    document.getElementById("noshows-list").innerHTML = `
+      <div class="alert warn">${r.total} no-shows en ${r.mes}</div>
+      ${al}${co}
+    `;
+  } catch (e) {
+    document.getElementById("noshows-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+loadKPIs();
+</script>
+</body>
+</html>

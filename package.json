@@ -1,0 +1,20 @@
+{
+  "name": "cotorreo-app",
+  "version": "1.0.0",
+  "description": "App de reservas para Grupo Cotorreo — Alpadel y Plaza Cotorreo",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  }
+}

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Maestro — Grupo Cotorreo</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="user-info">
+      <div>
+        <h1>🎾 <span id="userName">Maestro</span></h1>
+        <div class="subtitle">Tus clases en Alpadel</div>
+      </div>
+      <button onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="proximas">Próximas</button>
+    <button class="tab" data-tab="nueva">+ Nueva</button>
+    <button class="tab" data-tab="factura">Mi mes</button>
+  </div>
+
+  <div class="tab-content active" id="tab-proximas">
+    <div id="proximas-list" class="loading">Cargando</div>
+  </div>
+
+  <div class="tab-content" id="tab-nueva">
+    <div class="card">
+      <h3>Nueva reserva</h3>
+      <div class="form-group"><label>Fecha</label><input type="date" id="n-fecha" required></div>
+      <div class="form-group"><label>Hora</label><select id="n-hora" required></select></div>
+      <div class="form-group"><label>Duración</label><select id="n-duracion">
+        <option value="1" selected>1 hora</option>
+        <option value="1.5">1h 30 min</option>
+        <option value="2">2 horas</option>
+      </select></div>
+      <div class="form-group"><label>Cancha</label><select id="n-cancha" required>
+        <option value="Dobles">Cancha 1 — Dobles</option>
+        <option value="Singles">Cancha 2 — Singles</option>
+      </select></div>
+      <div class="form-group"><label>Notas (opcional)</label><textarea id="n-notas"></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="crearReserva()">Crear reserva</button>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-factura">
+    <div class="card">
+      <h3>📊 Mi mes</h3>
+      <div id="factura-info" class="loading">Cargando</div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+if (!requireRole(["maestro"])) throw new Error("Sin permiso");
+
+const user = getUser();
+document.getElementById("userName").textContent = user.nombre;
+
+// Tabs
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "factura") loadFactura();
+  });
+});
+
+// Llenar horas
+const horaSel = document.getElementById("n-hora");
+horaSel.innerHTML = '<option value="">Selecciona...</option>';
+for (let i = 7; i <= 22; i++) {
+  horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:00</option>`;
+  if (i < 22) horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:30</option>`;
+}
+document.getElementById("n-fecha").value = todayISO();
+
+// Cargar próximas
+async function loadProximas() {
+  try {
+    const r = await api("GET", "/api/mis-reservas");
+    if (!r.futuras.length) {
+      document.getElementById("proximas-list").innerHTML = "<div class='card'><em>Sin reservas futuras</em></div>";
+      return;
+    }
+    document.getElementById("proximas-list").innerHTML = r.futuras.map(x => `
+      <div class="reserva estado-${(x.estado || "").toLowerCase().replace("-", "")}">
+        <div class="reserva-info">
+          <div class="reserva-hora">${fmtFechaCorta(x.fechaHora)} · ${fmtHora(x.fechaHora)}-${fmtHora(x.horaFin)}</div>
+          <div class="reserva-meta">${x.cancha} · ${x.duracion}h</div>
+          <span class="badge ${(x.estado || "").toLowerCase().replace("-", "")}">${x.estado}</span>
+        </div>
+        <div class="reserva-acciones">
+          <button class="btn btn-danger btn-sm" onclick="cancelar('${x.id}')">Cancelar</button>
+        </div>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("proximas-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+async function cancelar(id) {
+  if (!confirm("¿Cancelar esta reserva?")) return;
+  try {
+    await api("DELETE", `/api/mi-reserva/${id}`);
+    alert("✅ Cancelada. Lili y Vicente recibirán la alerta.");
+    loadProximas();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+async function crearReserva() {
+  const data = {
+    fecha: document.getElementById("n-fecha").value,
+    hora: document.getElementById("n-hora").value,
+    duracion: parseFloat(document.getElementById("n-duracion").value),
+    cancha: document.getElementById("n-cancha").value,
+    notas: document.getElementById("n-notas").value,
+  };
+  if (!data.fecha || !data.hora || !data.cancha) return alert("Faltan datos");
+  try {
+    await api("POST", "/api/mi-reserva", data);
+    alert("✅ Reserva creada");
+    document.querySelector('[data-tab="proximas"]').click();
+    loadProximas();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+async function loadFactura() {
+  try {
+    const mes = new Date().toISOString().slice(0, 7);
+    const r = await api("GET", `/api/mi-facturacion?mes=${mes}`);
+    document.getElementById("factura-info").innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi"><div class="label">Clases del mes</div><div class="value">${r.reservas.length}</div></div>
+        <div class="kpi"><div class="label">Horas</div><div class="value">${r.totalHoras}</div></div>
+      </div>
+      <div class="kpi green" style="margin-top:10px;">
+        <div class="label">Total a pagar</div>
+        <div class="value">${fmtMonto(r.totalAPagar)}</div>
+      </div>
+      <p class="hint" style="margin-top:12px;">Estimado del mes. El cierre se hace el último día.</p>
+    `;
+  } catch (e) {
+    document.getElementById("factura-info").innerHTML = "Error: " + e.message;
+  }
+}
+
+loadProximas();
+</script>
+</body>
+</html>

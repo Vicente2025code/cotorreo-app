@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservar — Grupo Cotorreo</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="user-info">
+      <div>
+        <h1>📅 Hacer una reserva</h1>
+        <div class="subtitle">Te confirmamos por WhatsApp</div>
+      </div>
+      <a href="/" style="color:white; text-decoration:none;">←</a>
+    </div>
+  </div>
+
+  <div id="step-select">
+    <div class="card" style="text-align:center; padding:24px;">
+      <h2 style="margin-bottom:16px;">¿Qué quieres reservar?</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <button class="landing-option" onclick="selectTipo('alpadel')">
+          <div class="icon">🎾</div>
+          <div class="title">Cancha</div>
+          <div class="desc">Alpadel</div>
+        </button>
+        <button class="landing-option" onclick="selectTipo('cotorreo')">
+          <div class="icon">🍽️</div>
+          <div class="title">Mesa</div>
+          <div class="desc">Plaza Cotorreo</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM ALPADEL -->
+  <div id="step-alpadel" style="display:none;">
+    <div class="card">
+      <h2>🎾 Reservar cancha</h2>
+      <form id="form-alpadel" onsubmit="return submitAlpadel(event)">
+        <div class="form-group">
+          <label>Nombre completo <span class="required">*</span></label>
+          <input type="text" name="nombre" required>
+        </div>
+        <div class="form-group">
+          <label>Teléfono WhatsApp <span class="required">*</span></label>
+          <input type="tel" name="telefono" required placeholder="50688888888">
+          <div class="hint">Solo números, con código de país (506 Costa Rica)</div>
+        </div>
+        <div class="form-group">
+          <label>Email <span class="required">*</span></label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label>Cumpleaños <span class="required">*</span></label>
+          <input type="date" name="cumpleanos" required>
+          <div class="hint">Para felicitarte cada año 🎂</div>
+        </div>
+        <div class="form-group">
+          <label>Fecha de la reserva <span class="required">*</span></label>
+          <input type="date" name="fecha" id="fechaAlpadel" required>
+        </div>
+        <div class="form-group">
+          <label>Hora de inicio <span class="required">*</span></label>
+          <select name="hora" id="horaAlpadel" required>
+            <option value="">Selecciona...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Duración <span class="required">*</span></label>
+          <select name="duracion" required>
+            <option value="0.5">30 minutos</option>
+            <option value="1" selected>1 hora</option>
+            <option value="1.5">1 hora 30 min</option>
+            <option value="2">2 horas</option>
+            <option value="2.5">2 horas 30 min</option>
+            <option value="3">3 horas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cancha <span class="required">*</span></label>
+          <select name="cancha" required>
+            <option value="">Selecciona...</option>
+            <option value="Dobles">Cancha 1 — Dobles (grande)</option>
+            <option value="Singles">Cancha 2 — Singles (pequeña)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notas (opcional)</label>
+          <textarea name="notas" placeholder="Cualquier detalle especial"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Confirmar reserva</button>
+        <button type="button" class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="back()">← Cambiar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- FORM COTORREO -->
+  <div id="step-cotorreo" style="display:none;">
+    <div class="card">
+      <h2>🍽️ Reservar mesa</h2>
+      <form id="form-cotorreo" onsubmit="return submitCotorreo(event)">
+        <div class="form-group">
+          <label>Nombre completo <span class="required">*</span></label>
+          <input type="text" name="nombre" required>
+        </div>
+        <div class="form-group">
+          <label>Teléfono WhatsApp <span class="required">*</span></label>
+          <input type="tel" name="telefono" required placeholder="50688888888">
+        </div>
+        <div class="form-group">
+          <label>Email <span class="required">*</span></label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label>Cumpleaños <span class="required">*</span></label>
+          <input type="date" name="cumpleanos" required>
+        </div>
+        <div class="form-group">
+          <label>Fecha y hora <span class="required">*</span></label>
+          <input type="datetime-local" name="fechaHora" required>
+        </div>
+        <div class="form-group">
+          <label>Cantidad de personas <span class="required">*</span></label>
+          <input type="number" name="personas" min="1" max="20" required>
+        </div>
+        <div class="form-group">
+          <label>Ocasión (opcional)</label>
+          <select name="ocasion">
+            <option value="Ninguna">Ninguna</option>
+            <option value="Cumpleanos">Cumpleaños</option>
+            <option value="Aniversario">Aniversario</option>
+            <option value="Familiar">Familiar</option>
+            <option value="Negocios">Negocios</option>
+            <option value="Otra">Otra</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Área preferida (opcional)</label>
+          <select name="area">
+            <option value="">Sin preferencia</option>
+            <option value="Planta baja">Planta baja</option>
+            <option value="Planta alta">Planta alta</option>
+            <option value="Cerca del playground">Cerca del playground</option>
+            <option value="Planta alta pasillo con vista al arroyo">Planta alta · pasillo vista al arroyo</option>
+            <option value="Balcón por pool">Balcón por pool</option>
+            <option value="Sillas moradas">Sillas moradas</option>
+          </select>
+          <div class="hint">Si está disponible te la asignaremos</div>
+        </div>
+        <div class="form-group">
+          <label>Notas (opcional)</label>
+          <textarea name="notas" placeholder="Silla alta, mesa decorada, alergias..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Confirmar reserva</button>
+        <button type="button" class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="back()">← Cambiar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ÉXITO -->
+  <div id="step-success" style="display:none;">
+    <div class="card" style="text-align:center; padding:32px;">
+      <div style="font-size:60px;">✅</div>
+      <h2 style="margin:14px 0;">¡Reserva confirmada!</h2>
+      <p id="success-msg">Te enviamos la confirmación por WhatsApp.</p>
+      <button class="btn btn-primary" style="margin-top:20px;" onclick="window.location.href='/'">Volver al inicio</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+let tipo = null;
+
+function selectTipo(t) {
+  tipo = t;
+  document.getElementById("step-select").style.display = "none";
+  document.getElementById("step-" + t).style.display = "block";
+
+  if (t === "alpadel") {
+    // Setear fecha mínima y cargar horas
+    const f = document.getElementById("fechaAlpadel");
+    f.min = todayISO();
+    f.value = todayISO();
+    cargarHoras();
+    f.addEventListener("change", cargarHoras);
+  }
+}
+
+function back() {
+  tipo = null;
+  document.getElementById("step-select").style.display = "block";
+  document.getElementById("step-alpadel").style.display = "none";
+  document.getElementById("step-cotorreo").style.display = "none";
+}
+
+async function cargarHoras() {
+  const fecha = document.getElementById("fechaAlpadel").value;
+  const sel = document.getElementById("horaAlpadel");
+  sel.innerHTML = '<option value="">Cargando...</option>';
+  try {
+    const r = await fetch(`/api/disponibilidad/alpadel?fecha=${fecha}`);
+    const data = await r.json();
+    sel.innerHTML = '<option value="">Selecciona...</option>';
+    // Mostrar todas las horas, pero las ocupadas las grisamos
+    for (const h of data.horas) {
+      const opt = document.createElement("option");
+      opt.value = h;
+      // Ocupada si ambas canchas están ocupadas
+      const sOcupada = data.ocupados.Singles.includes(h);
+      const dOcupada = data.ocupados.Dobles.includes(h);
+      let label = h;
+      if (sOcupada && dOcupada) label += " (ocupado)";
+      else if (sOcupada) label += " (Singles ocupado)";
+      else if (dOcupada) label += " (Dobles ocupado)";
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">Error cargando horas</option>';
+  }
+}
+
+async function submitAlpadel(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+  data.duracion = parseFloat(data.duracion);
+
+  const btn = form.querySelector("button[type=submit]");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  try {
+    const r = await fetch("/api/reservas/alpadel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await r.json();
+    if (!r.ok || !json.ok) throw new Error(json.error || "Error");
+    showSuccess(json.reserva, "cancha");
+  } catch (err) {
+    alert("Error: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "Confirmar reserva";
+  }
+  return false;
+}
+
+async function submitCotorreo(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+  data.personas = parseInt(data.personas);
+
+  const btn = form.querySelector("button[type=submit]");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  try {
+    const r = await fetch("/api/reservas/cotorreo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await r.json();
+    if (!r.ok || !json.ok) throw new Error(json.error || "Error");
+    showSuccess(json.reserva, "mesa");
+  } catch (err) {
+    alert("Error: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "Confirmar reserva";
+  }
+  return false;
+}
+
+function showSuccess(reserva, tipo) {
+  document.getElementById("step-alpadel").style.display = "none";
+  document.getElementById("step-cotorreo").style.display = "none";
+  document.getElementById("step-success").style.display = "block";
+
+  let msg = `Tu ${tipo} está reservada. Te enviamos la confirmación al WhatsApp.`;
+  if (reserva.precio) msg += `\n\nMonto a pagar: ₡${reserva.precio.toLocaleString("es-MX")}`;
+  document.getElementById("success-msg").textContent = msg;
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>

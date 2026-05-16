@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Lili — Grupo Cotorreo</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="user-info">
+      <div>
+        <h1>👋 Hola, <span id="userName">Lili</span></h1>
+        <div class="subtitle" id="todayText"></div>
+      </div>
+      <button onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="hoy">Hoy</button>
+    <button class="tab" data-tab="reserva">+ Reserva</button>
+    <button class="tab" data-tab="paquetes">Paquetes</button>
+    <button class="tab" data-tab="recurrentes">Recurrentes</button>
+    <button class="tab" data-tab="cumples">Cumples</button>
+    <button class="tab" data-tab="maestros">Maestros</button>
+  </div>
+
+  <!-- TAB: HOY -->
+  <div class="tab-content active" id="tab-hoy">
+    <div class="card">
+      <h3>🎾 Alpadel — Hoy</h3>
+      <div id="alpadel-hoy" class="loading">Cargando</div>
+    </div>
+    <div class="card">
+      <h3>🍽️ Cotorreo — Hoy</h3>
+      <div id="cotorreo-hoy" class="loading">Cargando</div>
+    </div>
+  </div>
+
+  <!-- TAB: + RESERVA -->
+  <div class="tab-content" id="tab-reserva">
+    <div class="card">
+      <h3>Nueva reserva manual</h3>
+      <div class="form-group">
+        <label>¿Tipo?</label>
+        <select id="manualTipo">
+          <option value="alpadel">Cancha Alpadel</option>
+          <option value="cotorreo">Mesa Cotorreo</option>
+        </select>
+      </div>
+      <div id="manual-form"></div>
+    </div>
+  </div>
+
+  <!-- TAB: PAQUETES -->
+  <div class="tab-content" id="tab-paquetes">
+    <div class="card">
+      <h3>📦 Paquetes activos</h3>
+      <button class="btn btn-primary btn-sm" onclick="abrirCrearPaquete()" style="margin-bottom:12px;">+ Vender paquete</button>
+      <div id="paquetes-list" class="loading">Cargando</div>
+    </div>
+  </div>
+
+  <!-- TAB: RECURRENTES -->
+  <div class="tab-content" id="tab-recurrentes">
+    <div class="card">
+      <h3>🔁 Reservas recurrentes activas</h3>
+      <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()" style="margin-bottom:12px;">+ Nueva recurrente</button>
+      <div id="recurrentes-list" class="loading">Cargando</div>
+    </div>
+  </div>
+
+  <!-- TAB: CUMPLES -->
+  <div class="tab-content" id="tab-cumples">
+    <div class="card">
+      <h3>🎂 Cumpleañeros del mes</h3>
+      <div id="cumples-list" class="loading">Cargando</div>
+    </div>
+  </div>
+
+  <!-- TAB: MAESTROS -->
+  <div class="tab-content" id="tab-maestros">
+    <div class="card">
+      <h3>🎓 Maestros — Facturación del mes</h3>
+      <div id="maestros-list" class="loading">Cargando</div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+if (!requireRole(["lili", "gerencia"])) {
+  throw new Error("Sin permiso");
+}
+
+const user = getUser();
+document.getElementById("userName").textContent = user.nombre.split(" ")[0];
+document.getElementById("todayText").textContent = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+
+// ===== Tabs =====
+document.querySelectorAll(".tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    loadTab(btn.dataset.tab);
+  });
+});
+
+const cargados = {};
+function loadTab(t) {
+  if (cargados[t]) return;
+  cargados[t] = true;
+  switch (t) {
+    case "hoy": loadHoy(); break;
+    case "reserva": renderManualForm(); break;
+    case "paquetes": loadPaquetes(); break;
+    case "recurrentes": loadRecurrentes(); break;
+    case "cumples": loadCumples(); break;
+    case "maestros": loadMaestros(); break;
+  }
+}
+
+// ===== HOY =====
+async function loadHoy() {
+  try {
+    const data = await api("GET", "/api/reservas/hoy");
+    document.getElementById("alpadel-hoy").innerHTML = renderReservas(data.alpadel, "alpadel") || "<em>Sin reservas</em>";
+    document.getElementById("cotorreo-hoy").innerHTML = renderReservas(data.cotorreo, "cotorreo") || "<em>Sin reservas</em>";
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+function renderReservas(items, tipo) {
+  if (!items.length) return "";
+  return items.map((r) => {
+    const hora = fmtHora(r.fechaHora);
+    const meta = tipo === "alpadel"
+      ? `${r.cancha || "?"} · ${r.tipo || ""} · ${r.duracion || 1}h`
+      : `${r.personas || "?"} pax · ${r.ocasion !== "Ninguna" ? r.ocasion : ""}${r.area ? " · " + r.area : ""}`;
+    const estadoClass = (r.estado || "Confirmada").toLowerCase().replace("-", "");
+    return `
+      <div class="reserva estado-${estadoClass}">
+        <div class="reserva-info">
+          <div class="reserva-hora">${hora}</div>
+          <div class="reserva-nombre">${r.nombre || "—"}</div>
+          <div class="reserva-meta">${meta}</div>
+          <span class="badge ${estadoClass}">${r.estado}</span>
+        </div>
+        <div class="reserva-acciones">
+          <button class="btn btn-success btn-sm" onclick="cambiarEstado('${tipo}', '${r.id}', 'Completada')">✓ Llegó</button>
+          <button class="btn btn-warning btn-sm" onclick="cambiarEstado('${tipo}', '${r.id}', 'No-show')">No-show</button>
+          <button class="btn btn-danger btn-sm" onclick="cambiarEstado('${tipo}', '${r.id}', 'Cancelada')">Cancelar</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function cambiarEstado(tipo, id, estado) {
+  try {
+    await api("PATCH", `/api/reservas/${tipo}/${id}/estado`, { estado });
+    cargados.hoy = false;
+    loadHoy();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+// ===== MANUAL FORM =====
+function renderManualForm() {
+  const tipo = document.getElementById("manualTipo").value;
+  const cont = document.getElementById("manual-form");
+  if (tipo === "alpadel") {
+    cont.innerHTML = `
+      <div class="form-group"><label>Nombre cliente</label><input type="text" id="m-nombre"></div>
+      <div class="form-group"><label>Teléfono</label><input type="tel" id="m-telefono"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="m-email"></div>
+      <div class="form-group"><label>Cumpleaños</label><input type="date" id="m-cumpleanos"></div>
+      <div class="form-group"><label>Fecha</label><input type="date" id="m-fecha" value="${todayISO()}"></div>
+      <div class="form-group"><label>Hora</label><select id="m-hora">${horasOpts()}</select></div>
+      <div class="form-group"><label>Duración (h)</label><select id="m-duracion">
+        <option value="0.5">30 min</option><option value="1" selected>1h</option>
+        <option value="1.5">1h 30</option><option value="2">2h</option>
+        <option value="2.5">2h 30</option><option value="3">3h</option>
+      </select></div>
+      <div class="form-group"><label>Cancha</label><select id="m-cancha">
+        <option value="Dobles">Cancha 1 — Dobles</option>
+        <option value="Singles">Cancha 2 — Singles</option>
+      </select></div>
+      <div class="form-group"><label>Tipo</label><select id="m-tiporeserva">
+        <option value="Regular">Regular</option>
+        <option value="Paquete">Paquete</option>
+        <option value="Maestro">Maestro</option>
+        <option value="Bloqueo">Bloqueo</option>
+        <option value="Cortesía">Cortesía</option>
+      </select></div>
+      <div class="form-group"><label>Notas</label><textarea id="m-notas"></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="submitManualAlpadel()">Crear reserva</button>
+    `;
+  } else {
+    cont.innerHTML = `
+      <div class="form-group"><label>Nombre cliente</label><input type="text" id="m-nombre"></div>
+      <div class="form-group"><label>Teléfono</label><input type="tel" id="m-telefono"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="m-email"></div>
+      <div class="form-group"><label>Cumpleaños</label><input type="date" id="m-cumpleanos"></div>
+      <div class="form-group"><label>Fecha y hora</label><input type="datetime-local" id="m-fechahora"></div>
+      <div class="form-group"><label>Personas</label><input type="number" id="m-personas" min="1" max="20"></div>
+      <div class="form-group"><label>Ocasión</label><select id="m-ocasion">
+        <option value="Ninguna">Ninguna</option><option value="Cumpleanos">Cumpleaños</option>
+        <option value="Aniversario">Aniversario</option><option value="Familiar">Familiar</option>
+        <option value="Negocios">Negocios</option><option value="Otra">Otra</option>
+      </select></div>
+      <div class="form-group"><label>Área</label><select id="m-area">
+        <option value="">Sin preferencia</option>
+        <option>Planta baja</option><option>Planta alta</option>
+        <option>Cerca del playground</option>
+        <option>Planta alta pasillo con vista al arroyo</option>
+        <option>Balcón por pool</option><option>Sillas moradas</option>
+      </select></div>
+      <div class="form-group"><label>Notas</label><textarea id="m-notas"></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="submitManualCotorreo()">Crear reserva</button>
+    `;
+  }
+}
+document.getElementById("manualTipo").addEventListener("change", renderManualForm);
+
+function horasOpts() {
+  let h = '<option value="">Selecciona...</option>';
+  for (let i = 7; i <= 22; i++) {
+    h += `<option value="${String(i).padStart(2,"0")}:00">${String(i).padStart(2,"0")}:00</option>`;
+    if (i < 22) h += `<option value="${String(i).padStart(2,"0")}:30">${String(i).padStart(2,"0")}:30</option>`;
+  }
+  return h;
+}
+
+async function submitManualAlpadel() {
+  const data = {
+    nombre: document.getElementById("m-nombre").value,
+    telefono: document.getElementById("m-telefono").value,
+    email: document.getElementById("m-email").value,
+    cumpleanos: document.getElementById("m-cumpleanos").value,
+    fecha: document.getElementById("m-fecha").value,
+    hora: document.getElementById("m-hora").value,
+    duracion: parseFloat(document.getElementById("m-duracion").value),
+    cancha: document.getElementById("m-cancha").value,
+    tipo: document.getElementById("m-tiporeserva").value,
+    notas: document.getElementById("m-notas").value,
+  };
+  try {
+    await api("POST", "/api/reservas/alpadel/manual", data);
+    alert("✅ Reserva creada");
+    cargados.hoy = false;
+    document.querySelector('[data-tab="hoy"]').click();
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+async function submitManualCotorreo() {
+  const data = {
+    nombre: document.getElementById("m-nombre").value,
+    telefono: document.getElementById("m-telefono").value,
+    email: document.getElementById("m-email").value,
+    cumpleanos: document.getElementById("m-cumpleanos").value,
+    fechaHora: document.getElementById("m-fechahora").value,
+    personas: parseInt(document.getElementById("m-personas").value),
+    ocasion: document.getElementById("m-ocasion").value,
+    area: document.getElementById("m-area").value,
+    notas: document.getElementById("m-notas").value,
+  };
+  try {
+    await api("POST", "/api/reservas/cotorreo/manual", data);
+    alert("✅ Reserva creada");
+    cargados.hoy = false;
+    document.querySelector('[data-tab="hoy"]').click();
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+// ===== PAQUETES =====
+async function loadPaquetes() {
+  try {
+    const data = await api("GET", "/api/paquetes");
+    if (!data.paquetes.length) {
+      document.getElementById("paquetes-list").innerHTML = "<em>Sin paquetes activos</em>";
+      return;
+    }
+    document.getElementById("paquetes-list").innerHTML = data.paquetes.map(p => `
+      <div class="card" style="margin-bottom:8px;">
+        <strong>${p.referencia}</strong><br>
+        <small>${p.horasRestantes} de ${p.horasCompradas}h restantes · vence ${fmtFechaCorta(p.fechaVencimiento)}</small><br>
+        <span class="badge confirmada">${p.estado}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("paquetes-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+function abrirCrearPaquete() {
+  const tel = prompt("Teléfono del cliente:");
+  if (!tel) return;
+  const horas = prompt("Horas (3, 5 o 10):");
+  const precio = horas === "3" ? 30000 : horas === "5" ? 47500 : horas === "10" ? 90000 : null;
+  if (!precio) return alert("Solo 3, 5 o 10 horas");
+  // Buscar cliente y crear
+  api("GET", `/api/clientes/buscar?q=${tel}`).then(r => {
+    if (!r.clientes.length) return alert("Cliente no encontrado. Crea reserva primero.");
+    api("POST", "/api/paquetes", {
+      clienteId: r.clientes[0].id,
+      horasCompradas: parseInt(horas),
+      precioTotal: precio,
+    }).then(() => {
+      alert("✅ Paquete creado");
+      cargados.paquetes = false;
+      loadPaquetes();
+    }).catch(e => alert("Error: " + e.message));
+  });
+}
+
+// ===== RECURRENTES =====
+async function loadRecurrentes() {
+  try {
+    const data = await api("GET", "/api/recurrentes");
+    if (!data.recurrentes.length) {
+      document.getElementById("recurrentes-list").innerHTML = "<em>Sin recurrentes</em>";
+      return;
+    }
+    document.getElementById("recurrentes-list").innerHTML = data.recurrentes.map(r => `
+      <div class="card" style="margin-bottom:8px;">
+        <strong>${r.fields.Referencia}</strong><br>
+        ${r.fields["Día semana"]} ${r.fields["Hora inicio"]}-${r.fields["Hora fin"]} · ${r.fields.Cancha}<br>
+        <small>${fmtFechaCorta(r.fields["Fecha inicio"])} al ${fmtFechaCorta(r.fields["Fecha fin"])}</small>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("recurrentes-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+function abrirCrearRecurrente() {
+  alert("Por simplicidad, crea recurrentes desde Airtable directo por ahora. Próximamente acá.");
+}
+
+// ===== CUMPLES =====
+async function loadCumples() {
+  try {
+    const data = await api("GET", "/api/cumpleanos/mes");
+    if (!data.clientes.length) {
+      document.getElementById("cumples-list").innerHTML = "<em>Sin cumples este mes</em>";
+      return;
+    }
+    document.getElementById("cumples-list").innerHTML = data.clientes.map(c => `
+      <div class="reserva">
+        <div class="reserva-info">
+          <strong>${c.nombre}</strong><br>
+          <small>${fmtFechaCorta(c.cumpleanos)} · ${c.telefono || ""}</small>
+        </div>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("cumples-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+// ===== MAESTROS =====
+async function loadMaestros() {
+  try {
+    const r = await api("GET", "/api/maestros");
+    const mesActual = new Date().toISOString().slice(0, 7);
+    const lines = [];
+    for (const m of r.maestros) {
+      const fac = await api("GET", `/api/maestros/${m.id}/facturacion?mes=${mesActual}`);
+      lines.push(`
+        <div class="card" style="margin-bottom:8px;">
+          <strong>${m.nombre}</strong><br>
+          ${fac.reservas.length} clases · ${fac.totalHoras}h<br>
+          <strong style="color:var(--green)">A facturar: ₡${fac.totalAFacturar.toLocaleString("es-MX")}</strong>
+        </div>
+      `);
+    }
+    document.getElementById("maestros-list").innerHTML = lines.join("");
+  } catch (e) {
+    document.getElementById("maestros-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+// Inicial
+loadHoy();
+</script>
+
+</body>
+</html>
