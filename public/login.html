@@ -13,19 +13,14 @@
     <div class="user-info">
       <div>
         <h1>🔑 Acceso del equipo</h1>
-        <div class="subtitle">Ingresa tu PIN de 4 dígitos</div>
+        <div class="subtitle">Ingresa tu PIN de 6 dígitos</div>
       </div>
       <a href="/" style="color:white; text-decoration:none;">← Inicio</a>
     </div>
   </div>
 
   <div class="pin-pad">
-    <div class="pin-display">
-      <div class="pin-dot" id="d0"></div>
-      <div class="pin-dot" id="d1"></div>
-      <div class="pin-dot" id="d2"></div>
-      <div class="pin-dot" id="d3"></div>
-    </div>
+    <div class="pin-display" id="pinDisplay"></div>
 
     <div class="pin-keys">
       <button class="pin-key" data-key="1">1</button>
@@ -48,10 +43,20 @@
 
 <script src="/js/common.js"></script>
 <script>
+const PIN_LENGTH = 6;
 let pin = "";
 
+// Crear dots dinámicamente
+const display = document.getElementById("pinDisplay");
+for (let i = 0; i < PIN_LENGTH; i++) {
+  const d = document.createElement("div");
+  d.className = "pin-dot";
+  d.id = "d" + i;
+  display.appendChild(d);
+}
+
 function render() {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < PIN_LENGTH; i++) {
     document.getElementById("d" + i).classList.toggle("filled", i < pin.length);
   }
 }
@@ -76,7 +81,6 @@ async function tryLogin() {
       return;
     }
     setSession(json.token, json.user);
-    // Redirect según rol
     const rolPath = {
       gerencia: "/gerencia.html",
       lili: "/lili.html",
@@ -95,10 +99,10 @@ document.querySelectorAll(".pin-key").forEach((btn) => {
   btn.addEventListener("click", () => {
     const key = btn.dataset.key;
     const action = btn.dataset.action;
-    if (key && pin.length < 4) {
+    if (key && pin.length < PIN_LENGTH) {
       pin += key;
       render();
-      if (pin.length === 4) tryLogin();
+      if (pin.length === PIN_LENGTH) tryLogin();
     } else if (action === "back") {
       pin = pin.slice(0, -1);
       render();
@@ -111,10 +115,10 @@ document.querySelectorAll(".pin-key").forEach((btn) => {
 
 // Soporte teclado físico
 document.addEventListener("keydown", (e) => {
-  if (e.key >= "0" && e.key <= "9" && pin.length < 4) {
+  if (e.key >= "0" && e.key <= "9" && pin.length < PIN_LENGTH) {
     pin += e.key;
     render();
-    if (pin.length === 4) tryLogin();
+    if (pin.length === PIN_LENGTH) tryLogin();
   } else if (e.key === "Backspace") {
     pin = pin.slice(0, -1);
     render();

@@ -19,7 +19,7 @@ app.use(express.json({ limit: "1mb" }));
 // ===== Auth =====
 app.post("/api/auth/login", (req, res) => {
   const { pin } = req.body || {};
-  if (!pin || !/^\d{4}$/.test(pin))
+  if (!pin || !/^\d{4,8}$/.test(pin))
     return res.status(400).json({ error: "PIN inválido" });
   const ip = req.ip;
   const result = login(pin, ip);
