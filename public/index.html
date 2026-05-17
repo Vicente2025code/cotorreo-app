@@ -41,9 +41,11 @@
   }
 
   .home-logo {
-    height: 96px;       /* logo paraguas tiene ave + 2 líneas de texto, necesita más alto */
+    height: 120px;      /* logo paraguas tiene ave + 2 líneas de texto, necesita altura */
     width: auto;
     display: inline-block;
+    /* elimina el fondo blanco del PNG fusionándolo con el fondo de página */
+    mix-blend-mode: multiply;
   }
 
   .home-tagline {
