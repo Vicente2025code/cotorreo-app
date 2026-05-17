@@ -108,9 +108,12 @@ function buildCumpleanos({ cumpleanos, cumpleanosDia, cumpleanosMes }) {
  */
 async function findClienteByTelefono(telefono) {
   const phoneClean = (telefono || "").replace(/[^0-9]/g, "");
-  if (!phoneClean) return null;
+  if (!phoneClean || phoneClean.length < 8) return null;
+  // Comparar últimos 8 dígitos para tolerar formatos (+50672..., 50672..., 72...)
+  const last8 = phoneClean.slice(-8);
+  const formula = `RIGHT(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE({Telefono}, " ", ""), "+", ""), "-", ""), 8) = "${last8}"`;
   const found = await list(TABLES.Clientes, {
-    filterByFormula: `SUBSTITUTE({Telefono}, " ", "") = "${phoneClean}"`,
+    filterByFormula: formula,
     maxRecords: 1,
   });
   return found.records && found.records.length > 0 ? found.records[0] : null;
