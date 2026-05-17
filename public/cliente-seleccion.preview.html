@@ -60,12 +60,12 @@
   }
 
   .header-logo {
-    height: 88px;          /* contenedor grande para acomodar el scale */
+    height: 120px;
     width: auto;
     margin-left: auto;
     margin-right: auto;
     padding-right: 40px;
-    transform: scale(1.3); /* compensa whitespace del PNG */
+    transform: scale(1.5);
     mix-blend-mode: multiply;
   }
 
@@ -128,7 +128,7 @@
 
   .biz-logo-wrap {
     width: 100%;
-    height: 110px;
+    height: 160px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -151,7 +151,10 @@
      el texto "alpadel CLUB" ocupa apenas ~40% del canvas.
      Lo escalamos para igualar presencia visual con cotorreo (que ocupa todo). */
   .biz-logo.alpadel {
-    transform: scale(1.6);
+    transform: scale(1.8);
+  }
+  .biz-logo.cotorreo {
+    transform: scale(1.15);
   }
 
   .biz-body {
