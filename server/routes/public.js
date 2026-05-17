@@ -12,6 +12,40 @@ const { TABLES, list, create, upsertCliente, findClienteByTelefono, buildCumplea
 
 const router = express.Router();
 
+// ===========================
+// Rate limit en memoria (sin nuevas dependencias)
+// Protege endpoints sensibles contra enumeración / spam.
+// ===========================
+function createRateLimiter({ max, windowMs, message = "Demasiadas solicitudes, intentá en un momento." }) {
+  const buckets = new Map(); // ip → [timestamps]
+  return (req, res, next) => {
+    const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+    const now = Date.now();
+    const fresh = (buckets.get(ip) || []).filter(ts => now - ts < windowMs);
+    if (fresh.length >= max) {
+      res.set("Retry-After", String(Math.ceil(windowMs / 1000)));
+      return res.status(429).json({ error: message });
+    }
+    fresh.push(now);
+    buckets.set(ip, fresh);
+    // Limpieza ocasional para evitar memory leak en IPs viejas
+    if (buckets.size > 5000) {
+      for (const [k, v] of buckets) {
+        if (v.every(ts => now - ts >= windowMs)) buckets.delete(k);
+      }
+    }
+    next();
+  };
+}
+
+// /api/clientes/check: 15 requests/min por IP.
+// El bot legítimo hace ~1 por reserva. Un atacante enumerando se topa con 429.
+const checkLimiter = createRateLimiter({
+  max: 15,
+  windowMs: 60_000,
+  message: "Demasiadas consultas. Esperá un minuto."
+});
+
 // Horario operativo
 const HORAS = [];
 for (let h = 7; h < 22; h++) {
@@ -122,7 +156,7 @@ router.get("/disponibilidad/cotorreo", async (req, res) => {
 // Verifica si el teléfono ya existe. Solo devuelve { existe, nombre }.
 // NO devuelve email/cumpleaños/historial por privacidad.
 // ===========================
-router.get("/clientes/check", async (req, res) => {
+router.get("/clientes/check", checkLimiter, async (req, res) => {
   try {
     const { telefono } = req.query;
     if (!telefono) return res.status(400).json({ error: "Falta telefono" });
