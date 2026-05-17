@@ -8,20 +8,22 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_TTL = "24h";
 
-// Lee PINs desde variables de entorno
+// Lee PINs desde variables de entorno con prefijo PIN_
+// Soporta tanto formato fijo (PIN_0001..0099) como aleatorio (PIN_290380)
 function loadPins() {
   const pins = {};
-  for (let i = 1; i <= 99; i++) {
-    const key = `PIN_${String(i).padStart(4, "0")}`;
-    if (process.env[key]) {
-      const [nombre, rol, recordId] = process.env[key].split("|");
-      pins[String(i).padStart(4, "0")] = {
-        pin: String(i).padStart(4, "0"),
-        nombre,
-        rol,
-        recordId: recordId || null,
-      };
-    }
+  for (const key of Object.keys(process.env)) {
+    if (!key.startsWith("PIN_")) continue;
+    const pinValue = key.substring(4); // quitar "PIN_"
+    if (!/^\d{4,8}$/.test(pinValue)) continue;
+    const [nombre, rol, recordId] = (process.env[key] || "").split("|");
+    if (!nombre || !rol) continue;
+    pins[pinValue] = {
+      pin: pinValue,
+      nombre,
+      rol,
+      recordId: recordId || null,
+    };
   }
   return pins;
 }
