@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, upsertCliente, findClienteByTelefono, buildCumpleanos } = require("../airtable");
+const { TABLES, list, create, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono } = require("../airtable");
 
 const router = express.Router();
 
@@ -220,7 +220,7 @@ router.post("/reservas/alpadel", async (req, res) => {
       TABLES.ReservasAlpadel,
       {
         "Nombre cliente": nombre,
-        "Telefono cliente": telefono,
+        "Telefono cliente": normalizeTelefono(telefono),
         "Email cliente": email,
         "Cumpleaños cliente": cumpleanos,
         "Fecha y hora inicio": startCR.toISOString(),
@@ -299,7 +299,7 @@ router.post("/reservas/cotorreo", async (req, res) => {
       TABLES.ReservasCotorreo,
       {
         "Nombre cliente": nombre,
-        "Telefono cliente": telefono,
+        "Telefono cliente": normalizeTelefono(telefono),
         "Email cliente": email,
         "Cumpleaños cliente": cumpleanos,
         "Fecha y hora": new Date(fechaHora).toISOString(),

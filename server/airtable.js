@@ -106,6 +106,18 @@ function buildCumpleanos({ cumpleanos, cumpleanosDia, cumpleanosMes }) {
 /**
  * Busca un cliente por teléfono normalizado. Devuelve record o null.
  */
+/**
+ * Normaliza un teléfono al formato 506XXXXXXXX para Costa Rica.
+ * Asume CR si no tiene código país (8 dígitos exactos).
+ */
+function normalizeTelefono(telefono) {
+  const digits = (telefono || "").replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  if (digits.length === 8) return "506" + digits; // Solo número local CR
+  if (digits.length === 11 && digits.startsWith("506")) return digits;
+  return digits; // Cualquier otro: lo dejamos tal cual (extranjeros, otros)
+}
+
 async function findClienteByTelefono(telefono) {
   const phoneClean = (telefono || "").replace(/[^0-9]/g, "");
   if (!phoneClean || phoneClean.length < 8) return null;
@@ -120,10 +132,10 @@ async function findClienteByTelefono(telefono) {
 }
 
 async function upsertCliente({ nombre, telefono, email, cumpleanos, cumpleanosDia, cumpleanosMes, negocio }) {
-  const phoneClean = (telefono || "").replace(/[^0-9]/g, "");
-  if (!phoneClean) throw new Error("Teléfono requerido");
+  const phoneNormalized = normalizeTelefono(telefono);
+  if (!phoneNormalized) throw new Error("Teléfono requerido");
 
-  const existing = await findClienteByTelefono(phoneClean);
+  const existing = await findClienteByTelefono(phoneNormalized);
   if (existing) return existing;
 
   const cumpleFecha = buildCumpleanos({ cumpleanos, cumpleanosDia, cumpleanosMes });
@@ -132,7 +144,7 @@ async function upsertCliente({ nombre, telefono, email, cumpleanos, cumpleanosDi
     TABLES.Clientes,
     {
       "Nombre completo": nombre,
-      Telefono: phoneClean,
+      Telefono: phoneNormalized,
       Email: email || undefined,
       Cumpleanos: cumpleFecha || undefined,
       "Negocios que visita": negocio ? [negocio] : undefined,
@@ -152,4 +164,5 @@ module.exports = {
   upsertCliente,
   findClienteByTelefono,
   buildCumpleanos,
+  normalizeTelefono,
 };

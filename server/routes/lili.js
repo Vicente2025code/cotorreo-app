@@ -17,7 +17,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono } = require("../airtable");
+const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono } = require("../airtable");
 const { requireAuth } = require("../auth");
 
 const router = express.Router();
@@ -212,7 +212,7 @@ router.post(
         }
         fields.Cliente = [cliente.id];
         fields["Nombre cliente"] = nombre;
-        fields["Telefono cliente"] = telefono;
+        fields["Telefono cliente"] = normalizeTelefono(telefono);
         fields["Email cliente"] = email;
         if (cumpleanos) fields["Cumpleaños cliente"] = cumpleanos;
         if (tipo === "Paquete" && paqueteId) {
@@ -272,7 +272,7 @@ router.post(
         TABLES.ReservasCotorreo,
         {
           "Nombre cliente": nombre,
-          "Telefono cliente": telefono,
+          "Telefono cliente": normalizeTelefono(telefono),
           "Email cliente": email,
           "Cumpleaños cliente": cumpleanos,
           "Fecha y hora": new Date(fechaHora).toISOString(),
