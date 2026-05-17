@@ -35,16 +35,17 @@
 
   /* Header con logo paraguas centrado */
   .home-header {
-    padding-top: var(--space-12);
-    padding-bottom: var(--space-10);
+    padding-top: var(--space-10);
+    padding-bottom: var(--space-6);
     text-align: center;
   }
 
   .home-logo {
-    height: 120px;      /* logo paraguas tiene ave + 2 líneas de texto, necesita altura */
+    height: 240px;      /* contenedor grande para acomodar el scale */
     width: auto;
     display: inline-block;
-    /* elimina el fondo blanco del PNG fusionándolo con el fondo de página */
+    transform: scale(1.4);  /* compensa el whitespace integrado del PNG */
+    transform-origin: center;
     mix-blend-mode: multiply;
   }
 
