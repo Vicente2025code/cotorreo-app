@@ -1,0 +1,166 @@
+/* ============================================
+   Cotorreo Design Tokens v0.1
+   Fuente única de verdad para toda la app.
+   No editar valores directamente en otros CSS —
+   siempre referenciar var(--token-name).
+   ============================================ */
+
+:root {
+
+  /* ──────────────────────────────────────────
+     COLOR · Paleta de marca (extraída de logos)
+     ────────────────────────────────────────── */
+
+  /* Marca — colores base */
+  --brand-teal:      #1FA890;   /* Principal. Botones primarios, focus, links activos */
+  --brand-teal-700:  #178573;   /* Hover/active de teal */
+  --brand-teal-100:  #D9F0EB;   /* Backgrounds tenues con tinte de marca */
+
+  --brand-magenta:   #E91E63;   /* Emocional. Cumpleaños, badge "nuevo cliente" */
+  --brand-magenta-100: #FCE4EC;
+
+  --brand-yellow:    #FFC107;   /* Advertencias suaves, estado "pendiente" */
+  --brand-yellow-100: #FFF8E1;
+
+  --brand-cyan:      #00BCD4;   /* Info secundaria */
+  --brand-cyan-100:  #E0F7FA;
+
+
+  /* ──────────────────────────────────────────
+     COLOR · Sistema semántico (lo que usamos)
+     ────────────────────────────────────────── */
+
+  /* Primario — único color de marca usado en CTAs y estados */
+  --color-primary:        var(--brand-teal);
+  --color-primary-hover:  var(--brand-teal-700);
+  --color-primary-bg:     var(--brand-teal-100);
+
+  /* Acentos (uso restringido por reglas 60-30-10) */
+  --color-accent-emo:     var(--brand-magenta);     /* emocional, cumpleaños */
+  --color-accent-emo-bg:  var(--brand-magenta-100);
+  --color-accent-warn:    var(--brand-yellow);      /* advertencias suaves */
+  --color-accent-warn-bg: var(--brand-yellow-100);
+  --color-accent-info:    var(--brand-cyan);        /* info secundaria */
+  --color-accent-info-bg: var(--brand-cyan-100);
+
+  /* Estados sistémicos (no son colores de marca, son convenciones) */
+  --color-success:    #15803D;   /* verde más sobrio que el teal de marca */
+  --color-success-bg: #DCFCE7;
+  --color-danger:     #DC2626;
+  --color-danger-bg:  #FEE2E2;
+
+  /* Superficies / fondos */
+  --surface-page:     #F5F5F7;   /* fondo página */
+  --surface-card:     #FFFFFF;   /* fondo cards */
+  --surface-muted:    #F9FAFB;   /* secciones tenues dentro de cards */
+
+  /* Texto — 3 niveles + sobre marca */
+  --text-primary:     #0F172A;   /* texto principal — casi negro pero no puro */
+  --text-secondary:   #475569;   /* texto descriptivo, secundario */
+  --text-tertiary:    #94A3B8;   /* hints, labels secundarios, placeholders */
+  --text-on-brand:    #FFFFFF;   /* texto sobre fondos teal */
+  --text-link:        var(--color-primary);
+
+  /* Bordes y separadores */
+  --border-subtle:    #E2E8F0;
+  --border-strong:    #CBD5E1;
+  --border-focus:     var(--color-primary);
+
+
+  /* ──────────────────────────────────────────
+     TIPOGRAFÍA · Escala modular 1.250
+     ────────────────────────────────────────── */
+
+  --font-family:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+
+  /* Tamaños — escala 1.250 desde 16px base */
+  --text-xs:    12px;   /* hints, microcopy, labels */
+  --text-sm:    14px;   /* body secondary, captions */
+  --text-base:  16px;   /* body, inputs */
+  --text-lg:    18px;   /* énfasis sutil, subtítulos */
+  --text-xl:    20px;   /* títulos sección */
+  --text-2xl:   24px;   /* títulos card */
+  --text-3xl:   30px;   /* títulos página */
+  --text-4xl:   36px;   /* KPI hero, números grandes */
+  --text-5xl:   48px;   /* uso excepcional, ej. número grande de KPI principal */
+
+  /* Pesos */
+  --weight-regular:  400;
+  --weight-medium:   500;   /* labels, microcopy importante */
+  --weight-semibold: 600;   /* títulos, énfasis */
+  --weight-bold:     700;   /* uso excepcional para alarma */
+
+  /* Line-height */
+  --leading-tight:   1.2;   /* títulos grandes */
+  --leading-snug:    1.35;  /* subtítulos */
+  --leading-normal:  1.5;   /* body */
+  --leading-relaxed: 1.65;  /* texto largo */
+
+
+  /* ──────────────────────────────────────────
+     ESPACIADO · Escala 4px base
+     ────────────────────────────────────────── */
+
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;   /* base — separación entre campos de form */
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;   /* separación entre secciones */
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+
+
+  /* ──────────────────────────────────────────
+     RADIOS
+     ────────────────────────────────────────── */
+
+  --radius-sm:    4px;    /* badges chicos, hints */
+  --radius-md:    8px;    /* inputs, botones */
+  --radius-lg:    12px;   /* cards */
+  --radius-pill:  999px;  /* badges tipo pill */
+  --radius-circle: 50%;   /* avatares, dots, PIN dots */
+
+
+  /* ──────────────────────────────────────────
+     SOMBRAS · Solo 3 niveles funcionales
+     ────────────────────────────────────────── */
+
+  /* nivel 1 — elementos elevados sutil (cards) */
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+
+  /* nivel 2 — header sticky, dropdowns */
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07),
+               0 2px 4px -2px rgba(15, 23, 42, 0.04);
+
+  /* nivel 3 — modales, hover destacado (uso muy puntual) */
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08),
+               0 4px 6px -4px rgba(15, 23, 42, 0.05);
+
+  /* focus ring — sobre teal con alpha bajo */
+  --shadow-focus: 0 0 0 3px rgba(31, 168, 144, 0.18);
+
+
+  /* ──────────────────────────────────────────
+     TRANSICIONES
+     ────────────────────────────────────────── */
+
+  --t-fast:   120ms cubic-bezier(0.4, 0, 0.2, 1);   /* hover */
+  --t-base:   180ms cubic-bezier(0.4, 0, 0.2, 1);   /* focus, color */
+  --t-slow:   240ms cubic-bezier(0.4, 0, 0.2, 1);   /* slide, fade */
+
+
+  /* ──────────────────────────────────────────
+     LAYOUT
+     ────────────────────────────────────────── */
+
+  --content-max:   720px;       /* max-width contenedor app */
+  --tap-min:       44px;        /* mínimo área tappable (Apple HIG) */
+  --input-h:       44px;        /* alto de inputs y botones */
+  --header-h:      64px;        /* alto header sticky */
+
+}

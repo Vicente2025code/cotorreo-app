@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acceso — Grupo Cotorreo</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="user-info">
+      <div>
+        <h1>🔑 Acceso del equipo</h1>
+        <div class="subtitle">Ingresa tu PIN de 6 dígitos</div>
+      </div>
+      <a href="/" style="color:white; text-decoration:none;">← Inicio</a>
+    </div>
+  </div>
+
+  <div class="pin-pad">
+    <div class="pin-display" id="pinDisplay"></div>
+
+    <div class="pin-keys">
+      <button class="pin-key" data-key="1">1</button>
+      <button class="pin-key" data-key="2">2</button>
+      <button class="pin-key" data-key="3">3</button>
+      <button class="pin-key" data-key="4">4</button>
+      <button class="pin-key" data-key="5">5</button>
+      <button class="pin-key" data-key="6">6</button>
+      <button class="pin-key" data-key="7">7</button>
+      <button class="pin-key" data-key="8">8</button>
+      <button class="pin-key" data-key="9">9</button>
+      <button class="pin-key action" data-action="clear">Borrar</button>
+      <button class="pin-key" data-key="0">0</button>
+      <button class="pin-key action" data-action="back">←</button>
+    </div>
+
+    <div class="pin-error" id="error"></div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+const PIN_LENGTH = 6;
+let pin = "";
+
+// Crear dots dinámicamente
+const display = document.getElementById("pinDisplay");
+for (let i = 0; i < PIN_LENGTH; i++) {
+  const d = document.createElement("div");
+  d.className = "pin-dot";
+  d.id = "d" + i;
+  display.appendChild(d);
+}
+
+function render() {
+  for (let i = 0; i < PIN_LENGTH; i++) {
+    document.getElementById("d" + i).classList.toggle("filled", i < pin.length);
+  }
+}
+
+function showError(msg) {
+  document.getElementById("error").textContent = msg;
+  setTimeout(() => (document.getElementById("error").textContent = ""), 3500);
+}
+
+async function tryLogin() {
+  try {
+    const r = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const json = await r.json();
+    if (!r.ok || !json.ok) {
+      pin = "";
+      render();
+      showError(json.error || "Error");
+      return;
+    }
+    setSession(json.token, json.user);
+    const rolPath = {
+      gerencia: "/gerencia.html",
+      lili: "/lili.html",
+      maestro: "/maestro.html",
+      saloneros: "/restaurante.html",
+    };
+    window.location.href = rolPath[json.user.rol] || "/";
+  } catch (e) {
+    showError(e.message);
+    pin = "";
+    render();
+  }
+}
+
+document.querySelectorAll(".pin-key").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.key;
+    const action = btn.dataset.action;
+    if (key && pin.length < PIN_LENGTH) {
+      pin += key;
+      render();
+      if (pin.length === PIN_LENGTH) tryLogin();
+    } else if (action === "back") {
+      pin = pin.slice(0, -1);
+      render();
+    } else if (action === "clear") {
+      pin = "";
+      render();
+    }
+  });
+});
+
+// Soporte teclado físico
+document.addEventListener("keydown", (e) => {
+  if (e.key >= "0" && e.key <= "9" && pin.length < PIN_LENGTH) {
+    pin += e.key;
+    render();
+    if (pin.length === PIN_LENGTH) tryLogin();
+  } else if (e.key === "Backspace") {
+    pin = pin.slice(0, -1);
+    render();
+  } else if (e.key === "Escape") {
+    pin = "";
+    render();
+  }
+});
+</script>
+
+</body>
+</html>
