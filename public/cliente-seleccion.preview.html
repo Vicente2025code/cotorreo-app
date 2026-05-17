@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservar — Grupo Cotorreo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-family);
+    color: var(--text-primary);
+    background: var(--surface-page);
+    line-height: var(--leading-normal);
+    font-size: var(--text-base);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .header-back {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    transition: background var(--t-fast), color var(--t-fast);
+  }
+
+  .header-back:hover {
+    background: var(--surface-muted);
+    color: var(--text-primary);
+  }
+
+  .header-logo {
+    height: 40px;
+    width: auto;
+    margin-left: auto;
+    margin-right: auto;
+    /* compensar el width del back button para centrar el logo */
+    padding-right: 40px;
+  }
+
+  /* Main */
+  .main {
+    flex: 1;
+    padding: var(--space-8) var(--space-4) var(--space-6);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-title {
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    line-height: var(--leading-tight);
+    text-align: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .page-subtitle {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: var(--space-8);
+  }
+
+  /* Cards de selección de unidad */
+  .selector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 460px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .biz-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    background: var(--surface-card);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    transition: border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .biz-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .biz-card:active {
+    transform: translateY(0);
+  }
+
+  .biz-logo-wrap {
+    flex-shrink: 0;
+    width: 72px;
+    height: 72px;
+    display: grid;
+    place-items: center;
+    background: var(--surface-muted);
+    border-radius: var(--radius-md);
+    padding: var(--space-2);
+  }
+
+  .biz-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .biz-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .biz-name {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    line-height: var(--leading-snug);
+  }
+
+  .biz-what {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-top: 2px;
+    line-height: var(--leading-snug);
+  }
+
+  .biz-chevron {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    transition: transform var(--t-fast), color var(--t-fast);
+  }
+
+  .biz-card:hover .biz-chevron {
+    color: var(--color-primary);
+    transform: translateX(2px);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="app-header">
+    <a href="/" class="header-back" aria-label="Volver al inicio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m15 18-6-6 6-6"/>
+      </svg>
+    </a>
+    <img src="/assets/logos/grupo-cotorreo.png" alt="Grupo Cotorreo" class="header-logo">
+  </header>
+
+  <main class="main">
+    <h1 class="page-title">¿Qué quieres reservar?</h1>
+    <p class="page-subtitle">Te confirmamos por WhatsApp en minutos.</p>
+
+    <div class="selector">
+
+      <button type="button" class="biz-card" onclick="seleccionar('alpadel')">
+        <span class="biz-logo-wrap">
+          <img src="/assets/logos/alpadel.png" alt="" class="biz-logo">
+        </span>
+        <span class="biz-body">
+          <span class="biz-name">Cancha de pádel</span>
+          <span class="biz-what">Alpadel · cancha 1 dobles o cancha 2 singles</span>
+        </span>
+        <span class="biz-chevron" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </span>
+      </button>
+
+      <button type="button" class="biz-card" onclick="seleccionar('cotorreo')">
+        <span class="biz-logo-wrap">
+          <img src="/assets/logos/plaza-cotorreo.png" alt="" class="biz-logo">
+        </span>
+        <span class="biz-body">
+          <span class="biz-name">Mesa en restaurante</span>
+          <span class="biz-what">Plaza Cotorreo · varias áreas disponibles</span>
+        </span>
+        <span class="biz-chevron" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </span>
+      </button>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// Stub para preview — en producción navega al siguiente paso del flujo
+function seleccionar(tipo) {
+  alert(`(Preview) Continuaría al siguiente paso: validar teléfono para ${tipo === "alpadel" ? "cancha Alpadel" : "mesa Plaza Cotorreo"}`);
+}
+</script>
+
+</body>
+</html>
