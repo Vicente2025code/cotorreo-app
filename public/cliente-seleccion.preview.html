@@ -70,8 +70,6 @@
   .main {
     flex: 1;
     padding: var(--space-8) var(--space-4) var(--space-6);
-    display: flex;
-    flex-direction: column;
   }
 
   .page-title {
@@ -90,22 +88,19 @@
     margin-bottom: var(--space-8);
   }
 
-  /* Grid de selección — cards verticales lado a lado */
+  /* Grid de selección — 2 columnas en todo tamaño */
   .selector {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--space-3);
     max-width: 560px;
     margin: 0 auto;
-    width: 100%;
   }
 
   .biz-card {
+    /* Layout interno: logo arriba, texto abajo, sin solape */
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-6) var(--space-4);
     background: var(--surface-card);
     border: 1.5px solid var(--border-subtle);
     border-radius: var(--radius-lg);
@@ -113,10 +108,10 @@
     color: var(--text-primary);
     box-shadow: var(--shadow-sm);
     transition: border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
-    text-align: center;
     cursor: pointer;
     font-family: inherit;
-    min-height: 220px;
+    padding: var(--space-4);
+    overflow: hidden;       /* clave: contiene cualquier overflow del logo */
   }
 
   .biz-card:hover {
@@ -129,14 +124,14 @@
     transform: translateY(0);
   }
 
-  /* Wrap del logo: misma área cuadrada para AMBOS, object-fit contain
-     hace que cada logo respete su aspect ratio dentro del cuadro. */
+  /* Wrap del logo: bloque de altura fija que contiene la imagen */
   .biz-logo-wrap {
     width: 100%;
-    height: 110px;
-    display: grid;
-    place-items: center;
-    padding: var(--space-2);
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--space-3);
   }
 
   .biz-logo {
@@ -145,14 +140,22 @@
     width: auto;
     height: auto;
     object-fit: contain;
+    display: block;
   }
 
+  /* Compensación de whitespace: alpadel tiene mucho aire en su PNG,
+     lo escalamos para igualar presencia visual con Cotorreo */
+  .biz-logo.alpadel {
+    transform: scale(1.5);
+  }
+
+  /* Texto */
   .biz-body {
-    width: 100%;
+    text-align: center;
   }
 
   .biz-name {
-    font-size: var(--text-lg);
+    font-size: var(--text-base);
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
     line-height: var(--leading-snug);
@@ -162,15 +165,14 @@
   .biz-what {
     font-size: var(--text-xs);
     color: var(--text-secondary);
-    margin-top: var(--space-1);
+    margin-top: 2px;
     line-height: var(--leading-snug);
     display: block;
   }
 
-  /* En móvil chico (< 380px) las cards apiladas verticalmente */
+  /* En móvil chico, una columna */
   @media (max-width: 380px) {
     .selector { grid-template-columns: 1fr; }
-    .biz-card { min-height: 200px; }
   }
 </style>
 </head>
@@ -194,7 +196,7 @@
 
       <button type="button" class="biz-card" onclick="seleccionar('alpadel')">
         <span class="biz-logo-wrap">
-          <img src="/assets/logos/alpadel.png" alt="" class="biz-logo">
+          <img src="/assets/logos/alpadel.png" alt="" class="biz-logo alpadel">
         </span>
         <span class="biz-body">
           <span class="biz-name">Cancha de pádel</span>
@@ -204,7 +206,7 @@
 
       <button type="button" class="biz-card" onclick="seleccionar('cotorreo')">
         <span class="biz-logo-wrap">
-          <img src="/assets/logos/plaza-cotorreo.png" alt="" class="biz-logo">
+          <img src="/assets/logos/plaza-cotorreo.png" alt="" class="biz-logo cotorreo">
         </span>
         <span class="biz-body">
           <span class="biz-name">Mesa</span>
