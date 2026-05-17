@@ -641,6 +641,43 @@
 
   .whatsapp-note { font-size: var(--text-xs); color: var(--text-secondary); margin-top: 2px; }
 
+  /* ============ OPT-IN MARKETING (F2.1) ============ */
+  .optin-card {
+    background: var(--surface-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
+  }
+  .optin-card.is-hidden { display: none; }
+  .optin-title {
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+  }
+  .optin-desc {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: var(--leading-snug);
+    margin-bottom: var(--space-4);
+  }
+  .optin-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .optin-actions .btn-primary,
+  .optin-actions .btn-secondary { width: 100%; }
+  .optin-feedback {
+    font-size: var(--text-sm);
+    margin-top: var(--space-3);
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .optin-feedback.is-success { color: var(--color-primary); font-weight: var(--weight-semibold); }
+  .optin-feedback.is-error { color: #c53030; }
+
   /* Spinner animado para botones en estado loading */
   @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
   .btn-primary svg.spinning { animation: spin 1s linear infinite; }
@@ -992,6 +1029,19 @@
           <div class="whatsapp-note">Revisa tu WhatsApp</div>
         </div>
       </div>
+
+      <!-- F2.1 — Opt-in marketing -->
+      <section class="optin-card" id="optinCard">
+        <div class="optin-title">📣 ¿Querés recibir promos por WhatsApp?</div>
+        <p class="optin-desc">
+          Te avisamos del 2x1 lunes, Glow Pádel viernes, Domingo familiar y promos especiales. Te podés dar de baja cuando quieras.
+        </p>
+        <div class="optin-actions">
+          <button type="button" class="btn-primary" id="optinYes">Sí, agregame</button>
+          <button type="button" class="btn-secondary" id="optinNo">Ahora no</button>
+        </div>
+        <div class="optin-feedback" id="optinFeedback" role="status" aria-live="polite"></div>
+      </section>
 
       <a href="/" class="btn-secondary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1436,7 +1486,72 @@ function renderExito() {
   }
 
   document.getElementById("whatsappPhone").textContent = maskPhone(state.telefono);
+  resetOptin();
 }
+
+// ============================================
+// F2.1 — OPT-IN MARKETING
+// ============================================
+function resetOptin() {
+  const card = document.getElementById("optinCard");
+  const feedback = document.getElementById("optinFeedback");
+  if (!card) return;
+  card.classList.remove("is-hidden");
+  feedback.textContent = "";
+  feedback.className = "optin-feedback";
+  ["optinYes", "optinNo"].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = false;
+  });
+}
+
+async function enviarOptin(optIn) {
+  const card = document.getElementById("optinCard");
+  const feedback = document.getElementById("optinFeedback");
+  const btnYes = document.getElementById("optinYes");
+  const btnNo = document.getElementById("optinNo");
+
+  if (!state.telefono) {
+    feedback.textContent = "Error: falta teléfono.";
+    feedback.className = "optin-feedback is-error";
+    return;
+  }
+
+  btnYes.disabled = true;
+  btnNo.disabled = true;
+  feedback.textContent = "Guardando...";
+  feedback.className = "optin-feedback";
+
+  try {
+    const source = state.tipo === "alpadel" ? "reserva_alpadel" : "reserva_cotorreo";
+    const r = await fetch("/api/marketing/optin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telefono: state.telefono, optIn, source })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || `Error ${r.status}`);
+
+    card.classList.add("is-hidden");
+    feedback.textContent = optIn
+      ? "🎉 ¡Listo! Te avisaremos de las promos."
+      : "Sin problema, podés suscribirte cuando quieras.";
+    feedback.className = "optin-feedback is-success";
+  } catch (err) {
+    btnYes.disabled = false;
+    btnNo.disabled = false;
+    feedback.textContent = "No pudimos guardar tu respuesta. Intentalo más tarde.";
+    feedback.className = "optin-feedback is-error";
+    console.error("optin error", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const yes = document.getElementById("optinYes");
+  const no = document.getElementById("optinNo");
+  if (yes) yes.addEventListener("click", () => enviarOptin(true));
+  if (no) no.addEventListener("click", () => enviarOptin(false));
+});
 
 // ============================================
 // INIT: poblar selects de cumple y horas, deep-link
