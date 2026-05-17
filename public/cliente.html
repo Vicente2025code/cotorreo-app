@@ -360,6 +360,28 @@ function showSuccess(reserva, tipo) {
   document.getElementById("success-msg").textContent = msg;
   window.scrollTo(0, 0);
 }
+
+// Deep-link: el bot de WhatsApp manda links como
+//   cliente.html?tipo=alpadel&tel=50688887777
+// Si vienen estos parámetros, pre-seleccionamos el tipo y disparamos
+// el check de teléfono para que el cliente entre directo al form correcto.
+(function initFromQueryParams() {
+  const params = new URLSearchParams(window.location.search);
+  const rawTipo = (params.get("tipo") || "").toLowerCase();
+  const tipoMap = { alpadel: "alpadel", cancha: "alpadel", padel: "alpadel",
+                    cotorreo: "cotorreo", mesa: "cotorreo", restaurante: "cotorreo" };
+  const tipoResuelto = tipoMap[rawTipo];
+  if (!tipoResuelto) return;
+
+  selectTipo(tipoResuelto);
+
+  const tel = (params.get("tel") || "").replace(/[^0-9]/g, "");
+  if (tel.length >= 8) {
+    document.getElementById("telCheck").value = tel;
+    // pequeño delay para que el usuario vea visualmente lo que pasó
+    setTimeout(() => { checkTelefono(); }, 250);
+  }
+})();
 </script>
 
 </body>
