@@ -63,7 +63,6 @@
     width: auto;
     margin-left: auto;
     margin-right: auto;
-    /* compensar el width del back button para centrar el logo */
     padding-right: 40px;
   }
 
@@ -91,21 +90,22 @@
     margin-bottom: var(--space-8);
   }
 
-  /* Cards de selección de unidad */
+  /* Grid de selección — cards verticales lado a lado */
   .selector {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    max-width: 460px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    max-width: 560px;
     margin: 0 auto;
     width: 100%;
   }
 
   .biz-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-5);
+    gap: var(--space-3);
+    padding: var(--space-6) var(--space-4);
     background: var(--surface-card);
     border: 1.5px solid var(--border-subtle);
     border-radius: var(--radius-lg);
@@ -113,42 +113,42 @@
     color: var(--text-primary);
     box-shadow: var(--shadow-sm);
     transition: border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
-    text-align: left;
-    width: 100%;
+    text-align: center;
     cursor: pointer;
     font-family: inherit;
+    min-height: 220px;
   }
 
   .biz-card:hover {
     border-color: var(--color-primary);
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
   }
 
   .biz-card:active {
     transform: translateY(0);
   }
 
+  /* Wrap del logo: misma área cuadrada para AMBOS, object-fit contain
+     hace que cada logo respete su aspect ratio dentro del cuadro. */
   .biz-logo-wrap {
-    flex-shrink: 0;
-    width: 72px;
-    height: 72px;
+    width: 100%;
+    height: 110px;
     display: grid;
     place-items: center;
-    background: var(--surface-muted);
-    border-radius: var(--radius-md);
     padding: var(--space-2);
   }
 
   .biz-logo {
-    width: 100%;
-    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
   }
 
   .biz-body {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
   }
 
   .biz-name {
@@ -156,24 +156,21 @@
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
     line-height: var(--leading-snug);
+    display: block;
   }
 
   .biz-what {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     color: var(--text-secondary);
-    margin-top: 2px;
+    margin-top: var(--space-1);
     line-height: var(--leading-snug);
+    display: block;
   }
 
-  .biz-chevron {
-    flex-shrink: 0;
-    color: var(--text-tertiary);
-    transition: transform var(--t-fast), color var(--t-fast);
-  }
-
-  .biz-card:hover .biz-chevron {
-    color: var(--color-primary);
-    transform: translateX(2px);
+  /* En móvil chico (< 380px) las cards apiladas verticalmente */
+  @media (max-width: 380px) {
+    .selector { grid-template-columns: 1fr; }
+    .biz-card { min-height: 200px; }
   }
 </style>
 </head>
@@ -201,12 +198,7 @@
         </span>
         <span class="biz-body">
           <span class="biz-name">Cancha de pádel</span>
-          <span class="biz-what">Alpadel · cancha 1 dobles o cancha 2 singles</span>
-        </span>
-        <span class="biz-chevron" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m9 18 6-6-6-6"/>
-          </svg>
+          <span class="biz-what">Alpadel</span>
         </span>
       </button>
 
@@ -215,13 +207,8 @@
           <img src="/assets/logos/plaza-cotorreo.png" alt="" class="biz-logo">
         </span>
         <span class="biz-body">
-          <span class="biz-name">Mesa en restaurante</span>
-          <span class="biz-what">Plaza Cotorreo · varias áreas disponibles</span>
-        </span>
-        <span class="biz-chevron" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m9 18 6-6-6-6"/>
-          </svg>
+          <span class="biz-name">Mesa</span>
+          <span class="biz-what">Plaza Cotorreo</span>
         </span>
       </button>
 
@@ -230,7 +217,6 @@
 </div>
 
 <script>
-// Stub para preview — en producción navega al siguiente paso del flujo
 function seleccionar(tipo) {
   alert(`(Preview) Continuaría al siguiente paso: validar teléfono para ${tipo === "alpadel" ? "cancha Alpadel" : "mesa Plaza Cotorreo"}`);
 }
