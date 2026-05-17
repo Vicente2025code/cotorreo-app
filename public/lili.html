@@ -173,27 +173,101 @@ async function cambiarEstado(tipo, id, estado) {
 }
 
 // ===== MANUAL FORM =====
+let clienteSel = null;
+
+function buscadorClienteHTML() {
+  return `
+    <div class="form-group">
+      <label>Buscar cliente existente</label>
+      <input type="text" id="m-buscar" placeholder="Nombre, teléfono o email" oninput="buscarClientes()">
+      <div id="m-resultados" style="margin-top:6px;"></div>
+    </div>
+    <div id="m-cliente-sel" style="display:none; padding:10px; background:var(--green-soft); border-radius:8px; margin-bottom:10px;">
+      Cliente: <strong id="m-cliente-nombre"></strong>
+      <button type="button" class="btn btn-sm btn-secondary" style="margin-left:8px;" onclick="limpiarCliente()">Cambiar</button>
+    </div>
+    <div id="m-cliente-nuevo">
+      <div class="form-group"><label>Nombre cliente *</label><input type="text" id="m-nombre"></div>
+      <div class="form-group"><label>Teléfono *</label><input type="tel" id="m-telefono"></div>
+      <div class="form-group"><label>Email *</label><input type="email" id="m-email"></div>
+      <div class="form-group">
+        <label>Cumpleaños * (día y mes)</label>
+        <div style="display:flex; gap:8px;">
+          <select id="m-cumpleDia" style="flex:1;">${diasOpts()}</select>
+          <select id="m-cumpleMes" style="flex:2;">${mesesOpts()}</select>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function diasOpts() {
+  let h = '<option value="">Día</option>';
+  for (let i = 1; i <= 31; i++) h += `<option value="${String(i).padStart(2,"0")}">${i}</option>`;
+  return h;
+}
+function mesesOpts() {
+  const m = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  let h = '<option value="">Mes</option>';
+  m.forEach((n, i) => h += `<option value="${String(i+1).padStart(2,"0")}">${n}</option>`);
+  return h;
+}
+
+async function buscarClientes() {
+  const q = document.getElementById("m-buscar").value;
+  if (q.length < 2) {
+    document.getElementById("m-resultados").innerHTML = "";
+    return;
+  }
+  try {
+    const r = await api("GET", `/api/clientes/buscar?q=${encodeURIComponent(q)}`);
+    if (!r.clientes.length) {
+      document.getElementById("m-resultados").innerHTML = "<small>No hay resultados. Llena los datos abajo para crear nuevo.</small>";
+      return;
+    }
+    document.getElementById("m-resultados").innerHTML = r.clientes.map(c => `
+      <div onclick="seleccionarCliente('${c.id}','${(c.nombre||"").replace(/'/g,"\\'")}','${c.telefono||""}','${c.email||""}')"
+        style="padding:8px; border:1px solid var(--border); border-radius:6px; margin-bottom:4px; cursor:pointer; background:white;">
+        <strong>${c.nombre}</strong> · ${c.telefono || ""} · ${c.totalReservas} reservas
+      </div>
+    `).join("");
+  } catch (e) { console.error(e); }
+}
+
+function seleccionarCliente(id, nombre, telefono, email) {
+  clienteSel = { id, nombre, telefono, email };
+  document.getElementById("m-cliente-sel").style.display = "block";
+  document.getElementById("m-cliente-nombre").textContent = `${nombre} (${telefono})`;
+  document.getElementById("m-cliente-nuevo").style.display = "none";
+  document.getElementById("m-resultados").innerHTML = "";
+  document.getElementById("m-buscar").value = "";
+}
+
+function limpiarCliente() {
+  clienteSel = null;
+  document.getElementById("m-cliente-sel").style.display = "none";
+  document.getElementById("m-cliente-nuevo").style.display = "block";
+}
+
 function renderManualForm() {
   const tipo = document.getElementById("manualTipo").value;
   const cont = document.getElementById("manual-form");
+  clienteSel = null;
   if (tipo === "alpadel") {
-    cont.innerHTML = `
-      <div class="form-group"><label>Nombre cliente</label><input type="text" id="m-nombre"></div>
-      <div class="form-group"><label>Teléfono</label><input type="tel" id="m-telefono"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="m-email"></div>
-      <div class="form-group"><label>Cumpleaños</label><input type="date" id="m-cumpleanos"></div>
-      <div class="form-group"><label>Fecha</label><input type="date" id="m-fecha" value="${todayISO()}"></div>
-      <div class="form-group"><label>Hora</label><select id="m-hora">${horasOpts()}</select></div>
-      <div class="form-group"><label>Duración (h)</label><select id="m-duracion">
+    cont.innerHTML = buscadorClienteHTML() + `
+      <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+      <div class="form-group"><label>Fecha *</label><input type="date" id="m-fecha" value="${todayISO()}"></div>
+      <div class="form-group"><label>Hora *</label><select id="m-hora">${horasOpts()}</select></div>
+      <div class="form-group"><label>Duración *</label><select id="m-duracion">
         <option value="0.5">30 min</option><option value="1" selected>1h</option>
         <option value="1.5">1h 30</option><option value="2">2h</option>
         <option value="2.5">2h 30</option><option value="3">3h</option>
       </select></div>
-      <div class="form-group"><label>Cancha</label><select id="m-cancha">
+      <div class="form-group"><label>Cancha *</label><select id="m-cancha">
         <option value="Dobles">Cancha 1 — Dobles</option>
         <option value="Singles">Cancha 2 — Singles</option>
       </select></div>
-      <div class="form-group"><label>Tipo</label><select id="m-tiporeserva">
+      <div class="form-group"><label>Tipo de reserva</label><select id="m-tiporeserva">
         <option value="Regular">Regular</option>
         <option value="Paquete">Paquete</option>
         <option value="Maestro">Maestro</option>
@@ -204,13 +278,10 @@ function renderManualForm() {
       <button class="btn btn-primary btn-block" onclick="submitManualAlpadel()">Crear reserva</button>
     `;
   } else {
-    cont.innerHTML = `
-      <div class="form-group"><label>Nombre cliente</label><input type="text" id="m-nombre"></div>
-      <div class="form-group"><label>Teléfono</label><input type="tel" id="m-telefono"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="m-email"></div>
-      <div class="form-group"><label>Cumpleaños</label><input type="date" id="m-cumpleanos"></div>
-      <div class="form-group"><label>Fecha y hora</label><input type="datetime-local" id="m-fechahora"></div>
-      <div class="form-group"><label>Personas</label><input type="number" id="m-personas" min="1" max="20"></div>
+    cont.innerHTML = buscadorClienteHTML() + `
+      <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+      <div class="form-group"><label>Fecha y hora *</label><input type="datetime-local" id="m-fechahora"></div>
+      <div class="form-group"><label>Personas *</label><input type="number" id="m-personas" min="1" max="20"></div>
       <div class="form-group"><label>Ocasión</label><select id="m-ocasion">
         <option value="Ninguna">Ninguna</option><option value="Cumpleanos">Cumpleaños</option>
         <option value="Aniversario">Aniversario</option><option value="Familiar">Familiar</option>
@@ -239,19 +310,32 @@ function horasOpts() {
   return h;
 }
 
-async function submitManualAlpadel() {
-  const data = {
+function datosClienteBody() {
+  if (clienteSel) {
+    return {
+      clienteId: clienteSel.id,
+      nombre: clienteSel.nombre,
+      telefono: clienteSel.telefono,
+    };
+  }
+  return {
     nombre: document.getElementById("m-nombre").value,
     telefono: document.getElementById("m-telefono").value,
     email: document.getElementById("m-email").value,
-    cumpleanos: document.getElementById("m-cumpleanos").value,
+    cumpleanosDia: document.getElementById("m-cumpleDia").value,
+    cumpleanosMes: document.getElementById("m-cumpleMes").value,
+  };
+}
+
+async function submitManualAlpadel() {
+  const data = Object.assign(datosClienteBody(), {
     fecha: document.getElementById("m-fecha").value,
     hora: document.getElementById("m-hora").value,
     duracion: parseFloat(document.getElementById("m-duracion").value),
     cancha: document.getElementById("m-cancha").value,
     tipo: document.getElementById("m-tiporeserva").value,
     notas: document.getElementById("m-notas").value,
-  };
+  });
   try {
     await api("POST", "/api/reservas/alpadel/manual", data);
     alert("✅ Reserva creada");
@@ -261,17 +345,13 @@ async function submitManualAlpadel() {
 }
 
 async function submitManualCotorreo() {
-  const data = {
-    nombre: document.getElementById("m-nombre").value,
-    telefono: document.getElementById("m-telefono").value,
-    email: document.getElementById("m-email").value,
-    cumpleanos: document.getElementById("m-cumpleanos").value,
+  const data = Object.assign(datosClienteBody(), {
     fechaHora: document.getElementById("m-fechahora").value,
     personas: parseInt(document.getElementById("m-personas").value),
     ocasion: document.getElementById("m-ocasion").value,
     area: document.getElementById("m-area").value,
     notas: document.getElementById("m-notas").value,
-  };
+  });
   try {
     await api("POST", "/api/reservas/cotorreo/manual", data);
     alert("✅ Reserva creada");

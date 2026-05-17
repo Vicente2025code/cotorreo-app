@@ -39,10 +39,8 @@
   <div class="tab-content" id="tab-nueva-mesa">
     <div class="card">
       <h3>Nueva reserva mesa (teléfono)</h3>
-      <div class="form-group"><label>Nombre cliente *</label><input type="text" id="m-nombre"></div>
-      <div class="form-group"><label>Teléfono *</label><input type="tel" id="m-telefono"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="m-email"></div>
-      <div class="form-group"><label>Cumpleaños</label><input type="date" id="m-cumpleanos"></div>
+      <div id="busc-mesa"></div>
+      <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
       <div class="form-group"><label>Fecha y hora *</label><input type="datetime-local" id="m-fechahora"></div>
       <div class="form-group"><label>Personas *</label><input type="number" id="m-personas" min="1" max="20"></div>
       <div class="form-group"><label>Ocasión</label><select id="m-ocasion">
@@ -65,10 +63,8 @@
   <div class="tab-content" id="tab-nueva-cancha">
     <div class="card">
       <h3>Nueva reserva cancha (teléfono)</h3>
-      <div class="form-group"><label>Nombre *</label><input type="text" id="c-nombre"></div>
-      <div class="form-group"><label>Teléfono *</label><input type="tel" id="c-telefono"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="c-email"></div>
-      <div class="form-group"><label>Cumpleaños</label><input type="date" id="c-cumpleanos"></div>
+      <div id="busc-cancha"></div>
+      <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
       <div class="form-group"><label>Fecha *</label><input type="date" id="c-fecha"></div>
       <div class="form-group"><label>Hora *</label><select id="c-hora"></select></div>
       <div class="form-group"><label>Duración *</label><select id="c-duracion">
@@ -146,15 +142,101 @@ async function cambiarEstado(tipo, id, estado) {
   } catch (e) { alert(e.message); }
 }
 
-async function crearMesa() {
-  const data = {
-    nombre: m("nombre"), telefono: m("telefono"), email: m("email"),
-    cumpleanos: m("cumpleanos"), fechaHora: m("fechahora"),
-    personas: parseInt(m("personas")), ocasion: m("ocasion"),
-    area: m("area"), notas: m("notas"),
+// === Selector de cliente reutilizable ===
+const clienteSel = { mesa: null, cancha: null };
+
+function buscadorHTML(prefix, contextKey) {
+  return `
+    <div class="form-group">
+      <label>Buscar cliente existente</label>
+      <input type="text" id="${prefix}-buscar" placeholder="Nombre o teléfono" oninput="buscarClientes('${prefix}','${contextKey}')">
+      <div id="${prefix}-resultados" style="margin-top:6px;"></div>
+    </div>
+    <div id="${prefix}-sel" style="display:none; padding:10px; background:var(--green-soft); border-radius:8px; margin-bottom:10px;">
+      <strong id="${prefix}-sel-nombre"></strong>
+      <button type="button" class="btn btn-sm btn-secondary" style="margin-left:8px;" onclick="limpiarCliente('${prefix}','${contextKey}')">Cambiar</button>
+    </div>
+    <div id="${prefix}-nuevo">
+      <div class="form-group"><label>Nombre *</label><input type="text" id="${prefix}-nombre"></div>
+      <div class="form-group"><label>Teléfono *</label><input type="tel" id="${prefix}-telefono"></div>
+      <div class="form-group"><label>Email *</label><input type="email" id="${prefix}-email"></div>
+      <div class="form-group">
+        <label>Cumpleaños * (día y mes)</label>
+        <div style="display:flex; gap:8px;">
+          <select id="${prefix}-cumpleDia" style="flex:1;">${diasOpts()}</select>
+          <select id="${prefix}-cumpleMes" style="flex:2;">${mesesOpts()}</select>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function diasOpts() {
+  let h = '<option value="">Día</option>';
+  for (let i = 1; i <= 31; i++) h += `<option value="${String(i).padStart(2,"0")}">${i}</option>`;
+  return h;
+}
+function mesesOpts() {
+  const m = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  let h = '<option value="">Mes</option>';
+  m.forEach((n, i) => h += `<option value="${String(i+1).padStart(2,"0")}">${n}</option>`);
+  return h;
+}
+
+document.getElementById("busc-mesa").innerHTML = buscadorHTML("m", "mesa");
+document.getElementById("busc-cancha").innerHTML = buscadorHTML("c", "cancha");
+
+async function buscarClientes(prefix, contextKey) {
+  const q = document.getElementById(prefix + "-buscar").value;
+  if (q.length < 2) { document.getElementById(prefix + "-resultados").innerHTML = ""; return; }
+  try {
+    const r = await api("GET", `/api/clientes/buscar?q=${encodeURIComponent(q)}`);
+    if (!r.clientes.length) {
+      document.getElementById(prefix + "-resultados").innerHTML = "<small>No hay resultados. Llena los datos abajo para crear nuevo.</small>";
+      return;
+    }
+    document.getElementById(prefix + "-resultados").innerHTML = r.clientes.map(c =>
+      `<div onclick="seleccionarCliente('${prefix}','${contextKey}','${c.id}','${(c.nombre||"").replace(/'/g,"\\'")}','${c.telefono||""}')" style="padding:8px; border:1px solid var(--border); border-radius:6px; margin-bottom:4px; cursor:pointer; background:white;"><strong>${c.nombre}</strong> · ${c.telefono || ""}</div>`
+    ).join("");
+  } catch (e) { console.error(e); }
+}
+
+function seleccionarCliente(prefix, contextKey, id, nombre, telefono) {
+  clienteSel[contextKey] = { id, nombre, telefono };
+  document.getElementById(prefix + "-sel").style.display = "block";
+  document.getElementById(prefix + "-sel-nombre").textContent = `${nombre} (${telefono})`;
+  document.getElementById(prefix + "-nuevo").style.display = "none";
+  document.getElementById(prefix + "-resultados").innerHTML = "";
+  document.getElementById(prefix + "-buscar").value = "";
+}
+function limpiarCliente(prefix, contextKey) {
+  clienteSel[contextKey] = null;
+  document.getElementById(prefix + "-sel").style.display = "none";
+  document.getElementById(prefix + "-nuevo").style.display = "block";
+}
+
+function datosCliente(prefix, contextKey) {
+  if (clienteSel[contextKey]) {
+    return { clienteId: clienteSel[contextKey].id, nombre: clienteSel[contextKey].nombre, telefono: clienteSel[contextKey].telefono };
+  }
+  return {
+    nombre: document.getElementById(prefix + "-nombre").value,
+    telefono: document.getElementById(prefix + "-telefono").value,
+    email: document.getElementById(prefix + "-email").value,
+    cumpleanosDia: document.getElementById(prefix + "-cumpleDia").value,
+    cumpleanosMes: document.getElementById(prefix + "-cumpleMes").value,
   };
+}
+
+async function crearMesa() {
+  const data = Object.assign(datosCliente("m", "mesa"), {
+    fechaHora: document.getElementById("m-fechahora").value,
+    personas: parseInt(document.getElementById("m-personas").value),
+    ocasion: document.getElementById("m-ocasion").value,
+    area: document.getElementById("m-area").value,
+    notas: document.getElementById("m-notas").value,
+  });
   if (!data.nombre || !data.telefono || !data.fechaHora || !data.personas)
-    return alert("Faltan datos obligatorios");
+    return alert("Faltan datos");
   try {
     await api("POST", "/api/reservas/cotorreo/manual", data);
     alert("✅ Mesa reservada");
@@ -164,12 +246,14 @@ async function crearMesa() {
 }
 
 async function crearCancha() {
-  const data = {
-    nombre: c("nombre"), telefono: c("telefono"), email: c("email"),
-    cumpleanos: c("cumpleanos"), fecha: c("fecha"), hora: c("hora"),
-    duracion: parseFloat(c("duracion")), cancha: c("cancha"),
-    tipo: "Regular", notas: c("notas"),
-  };
+  const data = Object.assign(datosCliente("c", "cancha"), {
+    fecha: document.getElementById("c-fecha").value,
+    hora: document.getElementById("c-hora").value,
+    duracion: parseFloat(document.getElementById("c-duracion").value),
+    cancha: document.getElementById("c-cancha").value,
+    tipo: "Regular",
+    notas: document.getElementById("c-notas").value,
+  });
   if (!data.nombre || !data.telefono || !data.fecha || !data.hora)
     return alert("Faltan datos");
   try {
@@ -179,9 +263,6 @@ async function crearCancha() {
     loadHoy();
   } catch (e) { alert(e.message); }
 }
-
-function m(id) { return document.getElementById("m-" + id).value; }
-function c(id) { return document.getElementById("c-" + id).value; }
 
 loadHoy();
 </script>

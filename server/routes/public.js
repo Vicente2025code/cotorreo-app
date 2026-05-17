@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, upsertCliente } = require("../airtable");
+const { TABLES, list, create, upsertCliente, findClienteByTelefono, buildCumpleanos } = require("../airtable");
 
 const router = express.Router();
 
@@ -118,6 +118,28 @@ router.get("/disponibilidad/cotorreo", async (req, res) => {
 });
 
 // ===========================
+// GET /api/clientes/check?telefono=...
+// Verifica si el teléfono ya existe. Solo devuelve { existe, nombre }.
+// NO devuelve email/cumpleaños/historial por privacidad.
+// ===========================
+router.get("/clientes/check", async (req, res) => {
+  try {
+    const { telefono } = req.query;
+    if (!telefono) return res.status(400).json({ error: "Falta telefono" });
+    const cliente = await findClienteByTelefono(telefono);
+    if (!cliente) return res.json({ existe: false });
+    res.json({
+      existe: true,
+      nombre: cliente.fields["Nombre completo"] || "",
+      // No exponer email ni cumpleaños — privacidad
+    });
+  } catch (e) {
+    console.error("GET clientes/check", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
 // GET /api/tarifas/alpadel  (info pública)
 // ===========================
 router.get("/tarifas/alpadel", (_req, res) => {
@@ -150,6 +172,8 @@ router.post("/reservas/alpadel", async (req, res) => {
       telefono,
       email,
       cumpleanos,
+      cumpleanosDia,
+      cumpleanosMes,
       fecha,
       hora,
       duracion,
@@ -157,32 +181,37 @@ router.post("/reservas/alpadel", async (req, res) => {
       notas,
     } = req.body;
 
-    // Validaciones obligatorias
     const faltan = [];
     if (!nombre) faltan.push("nombre");
     if (!telefono) faltan.push("telefono");
-    if (!email) faltan.push("email");
-    if (!cumpleanos) faltan.push("cumpleanos");
     if (!fecha) faltan.push("fecha");
     if (!hora) faltan.push("hora");
     if (!duracion) faltan.push("duracion");
     if (!cancha || !["Singles", "Dobles"].includes(cancha))
       faltan.push("cancha");
+
+    // Email y cumpleaños solo obligatorios para clientes nuevos
+    const existing = await findClienteByTelefono(telefono);
+    if (!existing) {
+      if (!email) faltan.push("email");
+      if (!cumpleanos && !(cumpleanosDia && cumpleanosMes))
+        faltan.push("cumpleanos");
+    }
+
     if (faltan.length) {
       return res.status(400).json({ error: `Faltan: ${faltan.join(", ")}` });
     }
 
-    // Calcular Fecha y hora inicio + Hora fin (en CR, UTC-6)
-    const [hH, hM] = hora.split(":").map(Number);
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
 
-    // Upsert cliente
-    const cliente = await upsertCliente({
+    const cliente = existing || await upsertCliente({
       nombre,
       telefono,
       email,
       cumpleanos,
+      cumpleanosDia,
+      cumpleanosMes,
       negocio: "Alpadel",
     });
 
@@ -231,6 +260,8 @@ router.post("/reservas/cotorreo", async (req, res) => {
       telefono,
       email,
       cumpleanos,
+      cumpleanosDia,
+      cumpleanosMes,
       fechaHora,
       personas,
       ocasion,
@@ -241,18 +272,26 @@ router.post("/reservas/cotorreo", async (req, res) => {
     const faltan = [];
     if (!nombre) faltan.push("nombre");
     if (!telefono) faltan.push("telefono");
-    if (!email) faltan.push("email");
-    if (!cumpleanos) faltan.push("cumpleanos");
     if (!fechaHora) faltan.push("fechaHora");
     if (!personas) faltan.push("personas");
+
+    const existing = await findClienteByTelefono(telefono);
+    if (!existing) {
+      if (!email) faltan.push("email");
+      if (!cumpleanos && !(cumpleanosDia && cumpleanosMes))
+        faltan.push("cumpleanos");
+    }
+
     if (faltan.length)
       return res.status(400).json({ error: `Faltan: ${faltan.join(", ")}` });
 
-    const cliente = await upsertCliente({
+    const cliente = existing || await upsertCliente({
       nombre,
       telefono,
       email,
       cumpleanos,
+      cumpleanosDia,
+      cumpleanosMes,
       negocio: "Plaza Cotorreo",
     });
 

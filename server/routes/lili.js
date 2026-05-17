@@ -17,7 +17,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, get, create, update, upsertCliente } = require("../airtable");
+const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono } = require("../airtable");
 const { requireAuth } = require("../auth");
 
 const router = express.Router();
@@ -195,13 +195,21 @@ router.post(
           return res
             .status(400)
             .json({ error: "Para este tipo se necesita nombre y telefono" });
-        const cliente = await upsertCliente({
-          nombre,
-          telefono,
-          email,
-          cumpleanos,
-          negocio: "Alpadel",
-        });
+        const { cumpleanosDia, cumpleanosMes, clienteId } = req.body;
+        let cliente;
+        if (clienteId) {
+          cliente = await get(TABLES.Clientes, clienteId);
+        } else {
+          cliente = await upsertCliente({
+            nombre,
+            telefono,
+            email,
+            cumpleanos,
+            cumpleanosDia,
+            cumpleanosMes,
+            negocio: "Alpadel",
+          });
+        }
         fields.Cliente = [cliente.id];
         fields["Nombre cliente"] = nombre;
         fields["Telefono cliente"] = telefono;
@@ -235,23 +243,30 @@ router.post(
         telefono,
         email,
         cumpleanos,
+        cumpleanosDia,
+        cumpleanosMes,
         fechaHora,
         personas,
         ocasion,
         area,
         notas,
+        clienteId,
       } = req.body;
 
       if (!nombre || !telefono || !fechaHora || !personas)
         return res.status(400).json({ error: "Faltan datos" });
 
-      const cliente = await upsertCliente({
-        nombre,
-        telefono,
-        email,
-        cumpleanos,
-        negocio: "Plaza Cotorreo",
-      });
+      const cliente = clienteId
+        ? await get(TABLES.Clientes, clienteId)
+        : await upsertCliente({
+            nombre,
+            telefono,
+            email,
+            cumpleanos,
+            cumpleanosDia,
+            cumpleanosMes,
+            negocio: "Plaza Cotorreo",
+          });
 
       const r = await create(
         TABLES.ReservasCotorreo,

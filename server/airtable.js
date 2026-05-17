@@ -88,28 +88,50 @@ async function update(tableId, recordId, fields, options = {}) {
 /**
  * Busca o crea un cliente por teléfono. Devuelve el record completo.
  */
-async function upsertCliente({ nombre, telefono, email, cumpleanos, negocio }) {
-  const phoneClean = (telefono || "").replace(/[^0-9]/g, "");
-  if (!phoneClean) throw new Error("Teléfono requerido");
+/**
+ * Construye fecha de cumpleaños sin año.
+ * Acepta: { cumpleanosDia, cumpleanosMes } o cumpleanos directo (YYYY-MM-DD).
+ * Guarda siempre como 2000-MM-DD (año fijo, el workflow de cumple ignora año).
+ */
+function buildCumpleanos({ cumpleanos, cumpleanosDia, cumpleanosMes }) {
+  if (cumpleanos && /^\d{4}-\d{2}-\d{2}$/.test(cumpleanos)) return cumpleanos;
+  if (cumpleanosDia && cumpleanosMes) {
+    const d = String(cumpleanosDia).padStart(2, "0");
+    const m = String(cumpleanosMes).padStart(2, "0");
+    return `2000-${m}-${d}`;
+  }
+  return null;
+}
 
-  // Buscar por teléfono
+/**
+ * Busca un cliente por teléfono normalizado. Devuelve record o null.
+ */
+async function findClienteByTelefono(telefono) {
+  const phoneClean = (telefono || "").replace(/[^0-9]/g, "");
+  if (!phoneClean) return null;
   const found = await list(TABLES.Clientes, {
     filterByFormula: `SUBSTITUTE({Telefono}, " ", "") = "${phoneClean}"`,
     maxRecords: 1,
   });
+  return found.records && found.records.length > 0 ? found.records[0] : null;
+}
 
-  if (found.records && found.records.length > 0) {
-    return found.records[0];
-  }
+async function upsertCliente({ nombre, telefono, email, cumpleanos, cumpleanosDia, cumpleanosMes, negocio }) {
+  const phoneClean = (telefono || "").replace(/[^0-9]/g, "");
+  if (!phoneClean) throw new Error("Teléfono requerido");
 
-  // Crear nuevo
+  const existing = await findClienteByTelefono(phoneClean);
+  if (existing) return existing;
+
+  const cumpleFecha = buildCumpleanos({ cumpleanos, cumpleanosDia, cumpleanosMes });
+
   const created = await create(
     TABLES.Clientes,
     {
       "Nombre completo": nombre,
       Telefono: phoneClean,
       Email: email || undefined,
-      Cumpleanos: cumpleanos || undefined,
+      Cumpleanos: cumpleFecha || undefined,
       "Negocios que visita": negocio ? [negocio] : undefined,
     },
     { typecast: true }
@@ -125,4 +147,6 @@ module.exports = {
   create,
   update,
   upsertCliente,
+  findClienteByTelefono,
+  buildCumpleanos,
 };
