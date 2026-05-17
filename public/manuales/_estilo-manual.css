@@ -1,0 +1,305 @@
+/* ============================================
+   Cotorreo · Manuales del equipo (impresos)
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --teal: #1FA890;
+  --teal-700: #178573;
+  --teal-50: #D9F0EB;
+  --text: #0F172A;
+  --text-2: #475569;
+  --text-3: #94A3B8;
+  --bg: #FFFFFF;
+  --bg-2: #F9FAFB;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --green-bg: #DCFCE7;
+  --green: #15803D;
+  --red-bg: #FEE2E2;
+  --red: #DC2626;
+  --yellow-bg: #FFF8E1;
+  --yellow: #B45309;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: #F5F5F7;
+  line-height: 1.5;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.page {
+  max-width: 720px;
+  margin: 24px auto;
+  background: var(--bg);
+  padding: 40px 48px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-radius: 12px;
+}
+
+/* Header del manual */
+.manual-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--teal);
+  margin-bottom: 28px;
+}
+
+.manual-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.manual-header-logo {
+  height: 56px;
+  width: auto;
+  mix-blend-mode: multiply;
+}
+
+.manual-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.manual-header-subtitle {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.manual-header-role {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  background: var(--teal-50);
+  color: var(--teal-700);
+  border-radius: 999px;
+}
+
+/* Secciones */
+section.step {
+  margin-bottom: 32px;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #FFF;
+  font-weight: 700;
+  font-size: 13px;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.step-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 14px;
+  line-height: 1.3;
+}
+
+.step-body {
+  padding-left: 38px;
+}
+
+p { margin-bottom: 10px; color: var(--text-2); }
+p strong { color: var(--text); font-weight: 600; }
+
+/* Tarjetas de acción */
+.action-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--teal);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+
+.action-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.action-card-body {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* Cajas destacadas */
+.box {
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.box-info { background: var(--teal-50); color: var(--teal-700); border-left: 3px solid var(--teal); }
+.box-warn { background: var(--yellow-bg); color: var(--yellow); border-left: 3px solid #D97706; }
+.box-danger { background: var(--red-bg); color: var(--red); border-left: 3px solid var(--red); }
+.box-success { background: var(--green-bg); color: var(--green); border-left: 3px solid var(--green); }
+
+.box strong { color: inherit; }
+
+/* PIN placeholder */
+.pin-box {
+  background: var(--text);
+  color: #FFF;
+  padding: 20px 24px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0;
+}
+
+.pin-box-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+
+.pin-box-value {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pin-box-url {
+  font-size: 12px;
+  color: var(--teal-50);
+  text-align: right;
+  font-weight: 500;
+}
+
+/* Listas numeradas dentro de step-body */
+ol.tasks {
+  list-style: none;
+  counter-reset: task;
+  padding-left: 0;
+}
+
+ol.tasks > li {
+  counter-increment: task;
+  padding-left: 32px;
+  position: relative;
+  margin-bottom: 14px;
+  color: var(--text-2);
+}
+
+ol.tasks > li::before {
+  content: counter(task);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+ol.tasks > li strong { color: var(--text); }
+
+/* Tabs visual */
+.tabs-preview {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.tab-chip {
+  padding: 6px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.tab-chip.active {
+  background: var(--teal);
+  color: #FFF;
+  border-color: var(--teal);
+}
+
+/* FAQ */
+.faq-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.faq-item:last-child { border-bottom: none; }
+
+.faq-q {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.faq-a { font-size: 13px; color: var(--text-2); }
+
+/* Footer */
+.manual-footer {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.manual-footer a {
+  color: var(--teal-700);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* Print */
+@media print {
+  body { background: #FFF; }
+  .page {
+    box-shadow: none;
+    border-radius: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 24mm 20mm;
+  }
+  section.step { page-break-inside: avoid; }
+  .pin-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tab-chip.active { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

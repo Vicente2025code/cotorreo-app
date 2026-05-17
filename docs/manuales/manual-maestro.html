@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Maestro Alpadel — Grupo Cotorreo</title>
+<link rel="stylesheet" href="_estilo-manual.css">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="manual-header">
+    <div class="manual-header-brand">
+      <img src="../../public/assets/logos/grupo-cotorreo.png" alt="Grupo Cotorreo" class="manual-header-logo">
+      <div>
+        <div class="manual-header-title">Manual del sistema</div>
+        <div class="manual-header-subtitle">Reservas Alpadel · v1.0 (mayo 2026)</div>
+      </div>
+    </div>
+    <span class="manual-header-role">Maestro</span>
+  </header>
+
+  <!-- 1. Cómo entrar -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">1</span>Cómo entrar</h2>
+    <div class="step-body">
+      <p>Desde tu celular, en cualquier momento.</p>
+
+      <div class="pin-box">
+        <div>
+          <div class="pin-box-label">Tu PIN</div>
+          <div class="pin-box-value">___ ___</div>
+        </div>
+        <div>
+          <div class="pin-box-label">Sitio</div>
+          <div class="pin-box-url">cotorreo-app.onrender.com</div>
+        </div>
+      </div>
+
+      <ol class="tasks">
+        <li>Abrí <strong>cotorreo-app.onrender.com/login.html</strong> en tu celular</li>
+        <li>Escribí tu PIN de 6 dígitos</li>
+        <li>Entrás directo a tu panel</li>
+      </ol>
+
+      <div class="box box-info">
+        <strong>Guarda el sitio en tu celular como app:</strong> en iPhone tocá compartir → "Añadir a inicio". En Android tocá los tres puntos → "Añadir a pantalla principal". Así abrís el panel con un solo toque.
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Qué vas a ver -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">2</span>Qué vas a ver</h2>
+    <div class="step-body">
+      <p>Tu panel tiene <strong>3 pestañas</strong>, todo enfocado en tus clases:</p>
+
+      <div class="tabs-preview">
+        <span class="tab-chip active">Próximas</span>
+        <span class="tab-chip">+ Nueva</span>
+        <span class="tab-chip">Mi mes</span>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Próximas</div>
+        <div class="action-card-body">Tus clases programadas a futuro: fecha, hora, cancha y duración. Podés cancelar una si necesitás.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">+ Nueva</div>
+        <div class="action-card-body">Crear una clase nueva. Solo elegís fecha, hora, duración y cancha. No tenés que meter datos del alumno (esos se gestionan aparte).</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Mi mes</div>
+        <div class="action-card-body">Resumen del mes: cuántas clases diste, cuántas horas y <strong>cuánto te toca cobrar</strong>. Se actualiza solo conforme das clases.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Tareas más comunes -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">3</span>Tareas más comunes</h2>
+    <div class="step-body">
+
+      <div class="action-card">
+        <div class="action-card-title">Apartar una cancha para una clase</div>
+        <div class="action-card-body">
+          Pestaña <strong>+ Nueva</strong>:
+          <ol class="tasks" style="margin-top: 8px;">
+            <li>Elegí <strong>fecha</strong> (por defecto es hoy)</li>
+            <li>Elegí <strong>hora</strong> (slots cada 30 min, de 7am a 10pm)</li>
+            <li>Elegí <strong>duración</strong>: 1 hora, 1h 30min o 2 horas</li>
+            <li>Elegí <strong>cancha</strong>: 1 Dobles (grande) o 2 Singles (pequeña)</li>
+            <li>Si querés, agregá una nota (ej. nombre del alumno)</li>
+            <li>Tocá <strong>Crear reserva</strong></li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Ver mis próximas clases</div>
+        <div class="action-card-body">Pestaña <strong>Próximas</strong>. Por orden cronológico. Si está vacío, no tenés nada agendado.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Cancelar una clase</div>
+        <div class="action-card-body">Pestaña <strong>Próximas</strong> → tocá el botón rojo <strong>Cancelar</strong> en la clase que querés quitar. Te va a pedir que confirmes. Una vez confirmada, Vicente y Lili reciben aviso.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Saber cuánto voy a cobrar este mes</div>
+        <div class="action-card-body">Pestaña <strong>Mi mes</strong>. Te muestra cuántas clases diste, horas totales y monto a cobrar. El cierre se hace el último día del mes.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Cerrar sesión</div>
+        <div class="action-card-body">Botón <strong>Salir</strong> arriba a la derecha.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. Si algo falla -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">4</span>Si algo falla</h2>
+    <div class="step-body">
+
+      <div class="faq-item">
+        <div class="faq-q">Quiero apartar una hora pero ya está tomada</div>
+        <div class="faq-a">Probá otra hora cercana. Si necesitás esa hora específica, hablá con Lili o Vicente para ver si se puede liberar.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Cancelé por error</div>
+        <div class="faq-a">Volvé a crear la misma reserva en + Nueva con los mismos datos. No hay "deshacer".</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">El monto de "Mi mes" no coincide con lo que recuerdo</div>
+        <div class="faq-a">Revisá la pestaña Próximas y contá tus clases. Si hay desfase, hablá con Lili para revisar. NO es un cálculo manual — viene del sistema en base a las clases que creaste.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Me dice "PIN incorrecto"</div>
+        <div class="faq-a">Verificá que no haya espacios. Si fallás 3 veces, esperá 30 segundos.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">No carga nada, dice "Cargando..."</div>
+        <div class="faq-a">Salí (botón Salir) y volvé a entrar. Si sigue, refrescá la página deslizando hacia abajo.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. Contacto -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">5</span>Si necesitas ayuda</h2>
+    <div class="step-body">
+      <p>Para cualquier problema o duda, escribile a <strong>Vicente o Lili</strong> por WhatsApp.</p>
+
+      <div class="box box-warn">
+        <strong>Tu PIN es solo tuyo.</strong> No lo compartas con otros maestros ni con alumnos. Si alguien te lo pidió y dudás, avisale a Vicente.
+      </div>
+    </div>
+  </section>
+
+  <footer class="manual-footer">
+    <span>Grupo Cotorreo · Sistema interno v1.0</span>
+    <span>Mayo 2026</span>
+  </footer>
+
+</div>
+
+</body>
+</html>

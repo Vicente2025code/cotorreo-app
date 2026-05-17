@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Salonero — Grupo Cotorreo</title>
+<link rel="stylesheet" href="_estilo-manual.css">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="manual-header">
+    <div class="manual-header-brand">
+      <img src="/assets/logos/grupo-cotorreo.png" alt="Grupo Cotorreo" class="manual-header-logo">
+      <div>
+        <div class="manual-header-title">Manual del sistema</div>
+        <div class="manual-header-subtitle">Operación Restaurante · v1.0 (mayo 2026)</div>
+      </div>
+    </div>
+    <span class="manual-header-role">Salonero</span>
+  </header>
+
+  <!-- 1. Cómo entrar -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">1</span>Cómo entrar</h2>
+    <div class="step-body">
+      <p>Desde la tablet o computadora del restaurante.</p>
+
+      <div class="pin-box">
+        <div>
+          <div class="pin-box-label">Tu PIN</div>
+          <div class="pin-box-value">___ ___</div>
+        </div>
+        <div>
+          <div class="pin-box-label">Sitio</div>
+          <div class="pin-box-url">cotorreo-app.onrender.com</div>
+        </div>
+      </div>
+
+      <ol class="tasks">
+        <li>Abrí el navegador y entrá a <strong>cotorreo-app.onrender.com/login.html</strong></li>
+        <li>Escribí tu PIN de 6 dígitos</li>
+        <li>Tocá <strong>Entrar</strong>. Te lleva al panel del restaurante.</li>
+      </ol>
+
+      <div class="box box-info">
+        <strong>Consejo:</strong> dejá el sitio abierto en la tablet del restaurante durante todo el turno. Marcá como favorito o agregalo a inicio para no tener que escribir la dirección cada vez.
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Qué vas a ver -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">2</span>Qué vas a ver</h2>
+    <div class="step-body">
+      <p>El panel tiene <strong>3 pestañas</strong>:</p>
+
+      <div class="tabs-preview">
+        <span class="tab-chip active">Hoy</span>
+        <span class="tab-chip">+ Mesa</span>
+        <span class="tab-chip">+ Cancha</span>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Hoy</div>
+        <div class="action-card-body">Las reservas del día. Arriba <strong>Cotorreo</strong> (mesas del restaurante), abajo <strong>Alpadel</strong> (canchas). Cada reserva tiene 3 botones para marcar qué pasó.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">+ Mesa</div>
+        <div class="action-card-body">Crear una reserva de mesa cuando un cliente llame por teléfono o quiera reservar en persona.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">+ Cancha</div>
+        <div class="action-card-body">Crear reserva de cancha si por casualidad un cliente te pregunta y la app del cliente no le funciona.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Tareas más comunes -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">3</span>Tareas más comunes</h2>
+    <div class="step-body">
+
+      <div class="action-card">
+        <div class="action-card-title">Ver las mesas reservadas hoy</div>
+        <div class="action-card-body">Pestaña <strong>Hoy</strong> → bloque "Cotorreo - Hoy". Cada mesa muestra: hora, nombre del cliente, cantidad de personas, ocasión y área pedida (si pidieron alguna).</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Marcar que la mesa ya llegó</div>
+        <div class="action-card-body">En la reserva, tocá el botón verde con un <strong>✓</strong>. El estado cambia a "Completada".</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Marcar que la mesa NO llegó</div>
+        <div class="action-card-body">Si pasan 15 minutos y no aparecieron, tocá el botón amarillo con <strong>👻</strong>. Se registra como "No-show". Vicente revisa esto al fin de mes.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Cancelar una reserva</div>
+        <div class="action-card-body">Botón rojo con <strong>✗</strong>. Úsalo si el cliente avisó que ya no viene, o si tuviste que cerrar el área. El cliente NO recibe aviso automático — si la cancelaste vos, avisale por WhatsApp.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Crear reserva nueva por teléfono</div>
+        <div class="action-card-body">
+          Pestaña <strong>+ Mesa</strong>:
+          <ol class="tasks" style="margin-top: 8px;">
+            <li><strong>Buscá al cliente</strong> primero por nombre o teléfono. Si aparece, tocalo.</li>
+            <li>Si es nuevo, llená: nombre, teléfono, email y cumpleaños (día y mes)</li>
+            <li>Elegí <strong>fecha y hora</strong></li>
+            <li>Cantidad de <strong>personas</strong> (1 a 20)</li>
+            <li>Si te dicen, marcá <strong>ocasión</strong> (cumpleaños, aniversario, etc.) y <strong>área preferida</strong></li>
+            <li>Notas: alergia, silla alta para bebé, decoración, etc.</li>
+            <li>Tocá <strong>Crear reserva</strong></li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Saber si alguien viene a celebrar cumpleaños</div>
+        <div class="action-card-body">En pestaña <strong>Hoy</strong>, las reservas con ocasión "Cumpleaños" lo muestran junto al nombre. Avisá al maestro/cocina con tiempo para preparar el detalle.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Cerrar sesión al fin del turno</div>
+        <div class="action-card-body">Botón <strong>Salir</strong> arriba a la derecha. Importante si la tablet se queda accesible para otros.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. Si algo falla -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">4</span>Si algo falla</h2>
+    <div class="step-body">
+
+      <div class="faq-item">
+        <div class="faq-q">Llegó un cliente y dice "tengo reserva" pero no la veo</div>
+        <div class="faq-a">Andá a pestaña + Mesa y buscalo por teléfono. Si aparece como cliente pero no tiene reserva hoy, posiblemente reservó para otro día — confirmale. Si no aparece en absoluto, creá la reserva manual.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">El cliente quiere cambiar de mesa</div>
+        <div class="faq-a">No hace falta tocar nada en el sistema. El "área" es solo una preferencia que pidieron al reservar. Ofrecele lo que tengas disponible.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">El cliente quiere cambiar la hora</div>
+        <div class="faq-a">Cancelá la reserva actual (botón ✗) y creá una nueva en + Mesa con la hora nueva. Le va a llegar WhatsApp de confirmación de la nueva.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Hay un cumpleaños y se me olvidó avisar</div>
+        <div class="faq-a">No hay alerta automática a cocina. Es responsabilidad tuya revisar la pestaña Hoy al iniciar turno y avisar.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Me dice "PIN incorrecto"</div>
+        <div class="faq-a">Sin espacios. Si fallás 3 veces, esperá 30 segundos.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">No carga, queda en "Cargando..."</div>
+        <div class="faq-a">Refrescá la página. Si sigue, salí y volvé a entrar. Si todavía no, revisá que la tablet tenga internet.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Se cayó internet en el restaurante</div>
+        <div class="faq-a">Anotá en una libreta cualquier reserva o cambio que reciba. Cuando vuelva, registralos en + Mesa. Si una mesa ya llegó y no podés marcarla "Llegó", apuntala — lo hace Lili o Vicente al rato.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. Contacto -->
+  <section class="step">
+    <h2 class="step-title"><span class="step-num">5</span>Si necesitas ayuda</h2>
+    <div class="step-body">
+      <p>Cualquier duda o problema: <strong>Lili o Vicente</strong> por WhatsApp.</p>
+
+      <div class="box box-warn">
+        <strong>Tu PIN es solo tuyo.</strong> No lo compartas con los demás saloneros (cada quien tendrá el suyo). Si alguien te lo pidió, decile que le pida a Vicente uno propio.
+      </div>
+    </div>
+  </section>
+
+  <footer class="manual-footer">
+    <span>Grupo Cotorreo · Sistema interno v1.0</span>
+    <span>Mayo 2026</span>
+  </footer>
+
+</div>
+
+</body>
+</html>
