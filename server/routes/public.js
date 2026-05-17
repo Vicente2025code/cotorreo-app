@@ -54,6 +54,30 @@ for (let h = 7; h < 22; h++) {
 }
 HORAS.push("22:00");
 
+// Tarifas horarias Alpadel (CRC por hora completa)
+const TARIFAS_ALPADEL = {
+  matutino:   { Dobles: 6000,  Singles: 4000 }, // L-S 7am-4pm
+  vespertino: { Dobles: 12000, Singles: 6000 }, // L-S 4pm-10pm
+  domingo:    { Dobles: 6000,  Singles: 4000 }, // Domingo todo el día
+};
+
+// Calcula el precio de una reserva Alpadel prorrateando por slots de 30 min.
+// Cada slot se cobra a la tarifa de su franja (matutino/vespertino/domingo),
+// así una reserva que cruza las 4pm paga proporcional a los minutos en cada franja.
+function calcularPrecioAlpadel(startCR, endCR, cancha) {
+  if (!TARIFAS_ALPADEL.matutino[cancha]) return 0;
+  const SLOT_MS = 30 * 60 * 1000;
+  let total = 0;
+  for (let t = startCR.getTime(); t < endCR.getTime(); t += SLOT_MS) {
+    const crLocal = new Date(t - 6 * 3600 * 1000); // CR es UTC-6
+    const dow = crLocal.getUTCDay(); // 0 = domingo
+    const hourCR = crLocal.getUTCHours();
+    const franja = dow === 0 ? "domingo" : (hourCR < 16 ? "matutino" : "vespertino");
+    total += TARIFAS_ALPADEL[franja][cancha] * 0.5;
+  }
+  return total;
+}
+
 // ===========================
 // GET /api/disponibilidad/alpadel?fecha=YYYY-MM-DD
 // Devuelve horas libres por cancha para esa fecha
@@ -281,6 +305,7 @@ router.post("/reservas/alpadel", async (req, res) => {
 
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+    const precio = calcularPrecioAlpadel(startCR, endCR, cancha);
 
     const cliente = existing || await upsertCliente({
       nombre,
@@ -308,6 +333,7 @@ router.post("/reservas/alpadel", async (req, res) => {
         Cliente: [cliente.id],
         Notas: notas || undefined,
         Referencia: `Alpadel · ${nombre} · ${startCR.toISOString()}`,
+        Precio: precio,
       },
       { typecast: true }
     );
@@ -317,7 +343,7 @@ router.post("/reservas/alpadel", async (req, res) => {
       reserva: {
         id: reserva.id,
         referencia: reserva.fields.Referencia,
-        precio: reserva.fields.Precio,
+        precio,
       },
     });
   } catch (e) {
