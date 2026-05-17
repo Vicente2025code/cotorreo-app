@@ -60,12 +60,11 @@
   }
 
   .header-logo {
-    height: 120px;
+    height: 160px;     /* altura real, sin transform */
     width: auto;
     margin-left: auto;
     margin-right: auto;
     padding-right: 40px;
-    transform: scale(2.5);
     mix-blend-mode: multiply;
   }
 
@@ -128,11 +127,15 @@
 
   .biz-logo-wrap {
     width: 100%;
-    height: 160px;
+    height: 180px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: var(--space-4);
+    /* sin background — la card ya es blanca, mix-blend-mode necesita un fondo
+       sutilmente coloreado. Lo dejamos blanco y aceptamos que el blanco del PNG
+       de Cotorreo se fusiona naturalmente, mientras el alpadel mantiene su
+       texto teal sobre blanco visible */
   }
 
   .biz-logo {
@@ -142,19 +145,18 @@
     height: auto;
     object-fit: contain;
     display: block;
-    /* clave: hace que el fondo blanco del PNG se fusione con el fondo blanco
-       de la card y desaparezca visualmente */
     mix-blend-mode: multiply;
   }
 
-  /* alpadel.png tiene MUCHO whitespace integrado en el canvas:
-     el texto "alpadel CLUB" ocupa apenas ~40% del canvas.
-     Lo escalamos para igualar presencia visual con cotorreo (que ocupa todo). */
+  /* alpadel.png tiene whitespace integrado: el logo ocupa apenas ~50% del canvas.
+     Le damos width fijo más amplio para igualar presencia con Cotorreo */
   .biz-logo.alpadel {
-    transform: scale(2.3);
+    width: 100%;
+    height: auto;
   }
   .biz-logo.cotorreo {
-    transform: scale(1.15);
+    width: 85%;
+    height: auto;
   }
 
   .biz-body {
