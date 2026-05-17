@@ -34,12 +34,14 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-5) var(--space-4);
-    background: var(--surface-page);  /* gris claro para que mix-blend-mode funcione con el logo */
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-page);
     border-bottom: 1px solid var(--border-subtle);
     position: sticky;
     top: 0;
     z-index: 10;
+    /* prevent absolutamente cualquier desborde del logo hacia el contenido */
+    overflow: hidden;
   }
 
   .header-back {
@@ -60,12 +62,13 @@
   }
 
   .header-logo {
-    height: 160px;     /* altura real, sin transform */
+    height: 80px;     /* tamaño compacto que no invade el contenido siguiente */
     width: auto;
     margin-left: auto;
     margin-right: auto;
     padding-right: 40px;
     mix-blend-mode: multiply;
+    display: block;
   }
 
   /* Main */
