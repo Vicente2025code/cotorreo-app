@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono } = require("../airtable");
+const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono } = require("../airtable");
 
 const router = express.Router();
 
@@ -169,6 +169,49 @@ router.get("/clientes/check", checkLimiter, async (req, res) => {
     });
   } catch (e) {
     console.error("GET clientes/check", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
+// POST /api/marketing/optin
+// Body: { telefono, optIn (bool), source ("reserva_alpadel" | "reserva_cotorreo") }
+// Marca al cliente como suscrito a comunicaciones de marketing.
+// Idempotente: si ya estaba opt-in, actualiza solo la fecha.
+// ===========================
+const optinLimiter = createRateLimiter({
+  max: 20,
+  windowMs: 60_000,
+  message: "Demasiadas solicitudes."
+});
+
+router.post("/marketing/optin", optinLimiter, async (req, res) => {
+  try {
+    const { telefono, optIn, source } = req.body || {};
+    if (!telefono) return res.status(400).json({ error: "Falta telefono" });
+    if (typeof optIn !== "boolean") return res.status(400).json({ error: "Falta optIn (bool)" });
+    if (!source) return res.status(400).json({ error: "Falta source" });
+
+    const cliente = await findClienteByTelefono(telefono);
+    if (!cliente) return res.status(404).json({ error: "Cliente no encontrado" });
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    await update(
+      TABLES.Clientes,
+      cliente.id,
+      {
+        "Marketing optin": optIn,
+        "Marketing optin fecha": optIn ? today : null,
+        "Marketing optin source": optIn ? source : null
+      },
+      { typecast: true }
+    );
+
+    console.log(`✅ Marketing optin ${optIn ? "ACTIVADO" : "DESACTIVADO"} para cliente ${cliente.id} (source: ${source})`);
+    res.json({ ok: true, optIn });
+  } catch (e) {
+    console.error("POST marketing/optin", e);
     res.status(500).json({ error: e.message });
   }
 });
