@@ -59,7 +59,7 @@
 ## Decisiones que vale la pena discutir
 
 ### 1. Logo paraguas
-Uso `plaza-cotorreo.png` como brand-mark del grupo en el header. El brief dice "Plaza Cotorreo opera como paraguas Cotorreo de facto, ya que no hay logo paraguas separado". Si después diseñas un logo Grupo Cotorreo, ese reemplaza este en `index.html` y todo lo demás se mantiene.
+Uso `grupo-cotorreo.png` como brand-mark oficial del grupo en el header. Vicente confirmó que sí existía logo paraguas (no era necesario usar Plaza como paraguas de facto). Altura 96px para acomodar el ave + 2 líneas de texto del logo.
 
 ### 2. Color del icono "Soy del equipo"
 Lo dejo en `--color-primary` (teal). Alternativa: en gris neutro para que solo el de cliente destaque. Mi argumento: ambos son acciones primarias diferentes, no compiten — la jerarquía la hace el orden visual, no el color.

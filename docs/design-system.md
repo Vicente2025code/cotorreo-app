@@ -355,11 +355,18 @@ de fondo muy sutil (--color-primary-bg con opacity 30%).
 
 ---
 
-## 11. Decisiones de marca pendientes (para futuras versiones)
+## 11. Logos disponibles
 
-Estas no aplican a esta versión pero conviene documentarlas para v0.2:
+| Archivo | Uso |
+|---|---|
+| `/assets/logos/grupo-cotorreo.png` | Logo paraguas — usar en home y pantallas neutrales (login) |
+| `/assets/logos/plaza-cotorreo.png` | Logo de la unidad de negocio Plaza Cotorreo (restaurante) |
+| `/assets/logos/alpadel.png` | Logo de la unidad de negocio Alpadel (canchas) |
 
-- ¿Hay logo paraguas Grupo Cotorreo (no solo Plaza)? Hoy se usa Plaza Cotorreo como paraguas de facto
+**Regla:** en pantallas específicas de una unidad de negocio se usa su logo correspondiente. En pantallas neutrales o del grupo, el logo paraguas.
+
+## 12. Decisiones de marca pendientes (para futuras versiones)
+
 - ¿Tipografía propia de marca (no Inter)? Si se elige una, debe tener peso similar para no cambiar layouts
 - ¿Mapa de tono de voz (cómo escribe el sistema)? Hoy es "cálido y directo" pero no documentado
 - ¿Sistema de imágenes/fotografía si se agregan a la app?
@@ -371,3 +378,4 @@ Estas no aplican a esta versión pero conviene documentarlas para v0.2:
 | Versión | Fecha | Cambios |
 |---|---|---|
 | 0.1 | 16 may 2026 | Versión inicial. Tokens, escala, anatomía de componentes principales. |
+| 0.1.1 | 16 may 2026 | Agregado logo paraguas Grupo Cotorreo (antes se usaba Plaza como paraguas de facto). |
