@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tu WhatsApp — Grupo Cotorreo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-family);
+    color: var(--text-primary);
+    background: var(--surface-page);
+    line-height: var(--leading-normal);
+    font-size: var(--text-base);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header — mismo patrón que las otras pantallas */
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-page);
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    overflow: hidden;
+  }
+
+  .header-back {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    transition: background var(--t-fast), color var(--t-fast);
+    flex-shrink: 0;
+  }
+
+  .header-back:hover {
+    background: var(--surface-muted);
+    color: var(--text-primary);
+  }
+
+  .header-logo {
+    height: 120px;
+    width: auto;
+    margin-left: auto;
+    margin-right: auto;
+    padding-right: 40px;
+    mix-blend-mode: multiply;
+    display: block;
+  }
+
+  /* Indicador de tipo de reserva (badge) */
+  .header-context {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  .context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px var(--space-3);
+    background: var(--color-primary-bg);
+    color: var(--color-primary);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .context-badge svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Main */
+  .main {
+    flex: 1;
+    padding: var(--space-6) var(--space-4) var(--space-6);
+  }
+
+  .page-title {
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    line-height: var(--leading-tight);
+    text-align: center;
+    margin-bottom: var(--space-2);
+    max-width: 380px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .page-subtitle {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: var(--space-8);
+    max-width: 380px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Card del form */
+  .form-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6) var(--space-5);
+    max-width: 480px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Input grupo */
+  .form-group {
+    margin-bottom: var(--space-5);
+  }
+
+  .form-label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+  }
+
+  .form-label .required {
+    color: var(--color-accent-emo);
+    margin-left: 2px;
+  }
+
+  .input-wrap {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    transition: border-color var(--t-base), box-shadow var(--t-base);
+    overflow: hidden;
+  }
+
+  .input-wrap:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-focus);
+  }
+
+  .input-prefix {
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-3);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    border-right: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .input-tel {
+    flex: 1;
+    height: var(--input-h);
+    padding: 0 var(--space-3);
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: var(--text-base);
+    color: var(--text-primary);
+    outline: none;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .input-hint {
+    display: block;
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  /* Botón primario */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    width: 100%;
+    height: var(--input-h);
+    padding: 0 var(--space-5);
+    background: var(--color-primary);
+    color: var(--text-on-brand);
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    transition: background var(--t-fast), transform var(--t-fast);
+  }
+
+  .btn-primary:hover {
+    background: var(--color-primary-hover);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.99);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Mensaje de feedback */
+  .feedback {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    display: none;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .feedback.visible { display: flex; }
+
+  .feedback.success {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border-left: 3px solid var(--color-success);
+  }
+
+  .feedback.error {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-left: 3px solid var(--color-danger);
+  }
+
+  .feedback svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* Promesa WhatsApp como nota tenue al final */
+  .whatsapp-promise {
+    margin-top: var(--space-6);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  .whatsapp-promise svg {
+    width: 14px;
+    height: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="app-header">
+    <a href="/cliente.html" class="header-back" aria-label="Volver a selección">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m15 18-6-6 6-6"/>
+      </svg>
+    </a>
+    <img src="/assets/logos/grupo-cotorreo.png" alt="Grupo Cotorreo" class="header-logo">
+  </header>
+
+  <!-- Context badge: muestra qué está reservando -->
+  <div class="header-context">
+    <span class="context-badge" id="contextBadge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 7v5l3 3"/>
+      </svg>
+      Reservando Cancha de pádel
+    </span>
+  </div>
+
+  <main class="main">
+    <h1 class="page-title">¿Cuál es tu WhatsApp?</h1>
+    <p class="page-subtitle">Lo usamos para enviarte la confirmación y para reconocerte si ya eres cliente.</p>
+
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label" for="telCheck">
+          Teléfono WhatsApp <span class="required">*</span>
+        </label>
+        <div class="input-wrap">
+          <span class="input-prefix">+506</span>
+          <input
+            type="tel"
+            id="telCheck"
+            class="input-tel"
+            placeholder="8888 8888"
+            inputmode="tel"
+            autocomplete="tel"
+            maxlength="9"
+          >
+        </div>
+        <span class="input-hint">Solo los 8 dígitos (o pega tu número completo, lo arreglamos)</span>
+      </div>
+
+      <button type="button" class="btn-primary" onclick="checkTelefono()">
+        Continuar
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M13 5l7 7-7 7"/>
+        </svg>
+      </button>
+
+      <div class="feedback" id="feedback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 8v4M12 16h.01"/>
+        </svg>
+        <span id="feedbackMsg"></span>
+      </div>
+    </div>
+
+    <p class="whatsapp-promise">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </svg>
+      Te confirmamos por WhatsApp en minutos
+    </p>
+  </main>
+</div>
+
+<script>
+// Stub para preview — simula respuesta del backend
+function checkTelefono() {
+  const tel = document.getElementById("telCheck").value.replace(/[^0-9]/g, "");
+  const fb = document.getElementById("feedback");
+  const msg = document.getElementById("feedbackMsg");
+  fb.classList.remove("visible", "success", "error");
+
+  if (!tel || tel.length < 8) {
+    fb.classList.add("visible", "error");
+    msg.textContent = "Por favor ingresa al menos 8 dígitos";
+    return;
+  }
+
+  // Simula encontrar cliente existente si termina en "0001"
+  if (tel.endsWith("0001")) {
+    fb.classList.add("visible", "success");
+    msg.textContent = "¡Hola Vicente! Ya te conocemos. Continuando...";
+    return;
+  }
+
+  fb.classList.add("visible", "success");
+  msg.textContent = "Continuando con el formulario completo...";
+}
+
+// Auto-focus al input
+document.getElementById("telCheck").focus();
+</script>
+
+</body>
+</html>
