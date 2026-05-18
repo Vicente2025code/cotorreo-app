@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendario — Grupo Cotorreo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-family);
+    color: var(--text-primary);
+    background: var(--surface-page);
+    line-height: var(--leading-normal);
+    font-size: var(--text-base);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 100%; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-page);
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  .header-back {
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    background: transparent; border: none; cursor: pointer;
+    transition: background var(--t-fast);
+  }
+  .header-back:hover { background: var(--surface-muted); color: var(--text-primary); }
+
+  .header-title {
+    flex: 1;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .header-user {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  /* Controles del calendario */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+  }
+
+  .nav-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .btn-icon {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--t-fast), border-color var(--t-fast);
+  }
+  .btn-icon:hover { background: var(--surface-muted); border-color: var(--color-primary); color: var(--color-primary); }
+  .btn-icon svg { width: 18px; height: 18px; }
+
+  .date-range {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    min-width: 200px;
+    text-align: center;
+  }
+
+  .view-toggle {
+    display: flex;
+    background: var(--surface-muted);
+    border-radius: var(--radius-md);
+    padding: 3px;
+  }
+
+  .view-toggle button {
+    padding: 6px var(--space-3);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--t-fast);
+  }
+
+  .view-toggle button.active {
+    background: var(--surface-card);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .filter-chips {
+    display: flex;
+    gap: var(--space-2);
+    margin-left: auto;
+  }
+
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px var(--space-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    border: 1.5px solid;
+    transition: opacity var(--t-fast);
+    user-select: none;
+  }
+
+  .filter-chip.alpadel {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: var(--color-primary-bg);
+  }
+
+  .filter-chip.cotorreo {
+    color: var(--brand-magenta);
+    border-color: var(--brand-magenta);
+    background: var(--brand-magenta-100);
+  }
+
+  .filter-chip.disabled {
+    opacity: 0.4;
+    background: var(--surface-muted) !important;
+    color: var(--text-tertiary) !important;
+    border-color: var(--border-subtle) !important;
+  }
+
+  .filter-chip::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* Main calendar area */
+  .calendar-main {
+    flex: 1;
+    padding: var(--space-4);
+    overflow: hidden;
+  }
+
+  /* ============ VISTA SEMANA ============ */
+  .week-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(7, 1fr);
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .week-day-header {
+    padding: var(--space-3) var(--space-2);
+    text-align: center;
+    background: var(--surface-muted);
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .week-day-header:last-child { border-right: none; }
+  .week-day-header.today { background: var(--color-primary-bg); }
+
+  .week-day-name {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+    font-weight: var(--weight-semibold);
+  }
+
+  .week-day-num {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin-top: 2px;
+  }
+
+  .week-day-header.today .week-day-num { color: var(--color-primary); }
+
+  .week-hour-label {
+    padding: 6px 4px;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    text-align: right;
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    height: 48px;
+  }
+
+  .week-cell {
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    position: relative;
+    cursor: pointer;
+    transition: background var(--t-fast);
+    height: 48px;
+    min-width: 0;
+  }
+
+  .week-cell:hover { background: var(--surface-muted); }
+  .week-cell:last-child { border-right: none; }
+  .week-cell.today { background: rgba(31, 168, 144, 0.04); }
+  .week-cell.today:hover { background: rgba(31, 168, 144, 0.08); }
+
+  /* Bloques de reserva en vista semana */
+  .reserva-block {
+    position: absolute;
+    left: 2px; right: 2px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: white;
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 2;
+    line-height: 1.2;
+  }
+
+  .reserva-block.alpadel { background: var(--color-primary); }
+  .reserva-block.cotorreo { background: var(--brand-magenta); }
+  .reserva-block:hover { opacity: 0.85; }
+  .reserva-block.estado-noshow { background: var(--brand-yellow); color: var(--text-primary); }
+  .reserva-block.estado-completada { opacity: 0.55; }
+
+  .reserva-block-name { font-weight: var(--weight-semibold); }
+  .reserva-block-meta { font-size: 10px; opacity: 0.9; font-weight: var(--weight-regular); }
+
+  /* ============ VISTA DÍA ============ */
+  .day-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr 1fr 1fr;
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .day-grid.no-cotorreo { grid-template-columns: 60px 1fr 1fr; }
+  .day-grid.no-alpadel { grid-template-columns: 60px 1fr; }
+
+  .day-col-header {
+    padding: var(--space-3);
+    text-align: center;
+    background: var(--surface-muted);
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: var(--weight-semibold);
+  }
+
+  .day-col-header.alpadel { color: var(--color-primary); }
+  .day-col-header.cotorreo { color: var(--brand-magenta); }
+
+  .day-cell {
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    height: 32px;
+    position: relative;
+    cursor: pointer;
+    transition: background var(--t-fast);
+  }
+
+  .day-cell:hover { background: var(--surface-muted); }
+  .day-cell:last-child { border-right: none; }
+
+  /* ============ VISTA MES ============ */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0;
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .month-day-name {
+    padding: var(--space-2);
+    background: var(--surface-muted);
+    text-align: center;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+    font-weight: var(--weight-semibold);
+    border-bottom: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  .month-day {
+    min-height: 90px;
+    padding: var(--space-2);
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-card);
+    cursor: pointer;
+    transition: background var(--t-fast);
+  }
+
+  .month-day:hover { background: var(--surface-muted); }
+  .month-day.other-month { background: var(--surface-muted); opacity: 0.6; }
+  .month-day.today { background: var(--color-primary-bg); }
+
+  .month-day-num {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .month-day.today .month-day-num { color: var(--color-primary); }
+
+  .month-counts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .month-count {
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    padding: 1px 4px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    width: fit-content;
+  }
+  .month-count::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .month-count.alpadel { color: var(--color-primary); background: var(--color-primary-bg); }
+  .month-count.cotorreo { color: var(--brand-magenta); background: var(--brand-magenta-100); }
+
+  /* ============ MODAL ============ */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    z-index: 100;
+  }
+
+  .modal-overlay.visible { display: flex; }
+
+  .modal {
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    max-width: 480px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .modal-header {
+    padding: var(--space-5) var(--space-5) var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); }
+
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+  }
+  .modal-close:hover { background: var(--surface-muted); color: var(--text-primary); }
+  .modal-close svg { width: 20px; height: 20px; }
+
+  .modal-body { padding: var(--space-5); }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--text-sm);
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { color: var(--text-secondary); }
+  .detail-value { color: var(--text-primary); font-weight: var(--weight-semibold); }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5) var(--space-5);
+  }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px var(--space-3); border-radius: var(--radius-md); font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; border: 1.5px solid; transition: opacity var(--t-fast); }
+  .btn:hover { opacity: 0.85; }
+  .btn-success { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success); }
+  .btn-warn { background: var(--color-accent-warn-bg); color: #8B6914; border-color: var(--color-accent-warn); }
+  .btn-danger { background: var(--color-danger-bg); color: var(--color-danger); border-color: var(--color-danger); }
+
+  /* Form crear reserva */
+  .form-group { margin-bottom: var(--space-4); }
+  .form-label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    margin-bottom: var(--space-2);
+  }
+
+  .input, .select {
+    width: 100%;
+    height: var(--input-h);
+    padding: 0 var(--space-3);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    font-family: inherit;
+    font-size: var(--text-base);
+    color: var(--text-primary);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .input:focus, .select:focus { border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
+
+  .modal-tabs {
+    display: flex;
+    gap: 4px;
+    padding: var(--space-3) var(--space-5) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .modal-tab {
+    padding: 10px var(--space-4);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-family: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: -1px;
+  }
+
+  .modal-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+
+  .btn-create {
+    width: 100%;
+    height: 48px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+  }
+  .btn-create:hover { background: var(--color-primary-hover); }
+  .btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--text-tertiary);
+  }
+
+  /* Responsive */
+  @media (max-width: 720px) {
+    .controls { flex-direction: column; align-items: stretch; }
+    .filter-chips { margin-left: 0; justify-content: center; }
+    .week-day-name { font-size: 10px; }
+    .week-cell { height: 36px; }
+    .month-day { min-height: 70px; }
+    .reserva-block-meta { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <button class="header-back" onclick="volver()" aria-label="Volver">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m15 18-6-6 6-6"/>
+      </svg>
+    </button>
+    <div class="header-title">Calendario</div>
+    <div class="header-user" id="headerUser"></div>
+  </header>
+
+  <!-- CONTROLES -->
+  <div class="controls">
+    <div class="nav-group">
+      <button class="btn-icon" onclick="navegar(-1)" aria-label="Anterior">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m15 18-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="date-range" id="dateRange">—</div>
+      <button class="btn-icon" onclick="navegar(1)" aria-label="Siguiente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m9 18 6-6-6-6"/>
+        </svg>
+      </button>
+      <button class="btn-icon" onclick="irHoy()" aria-label="Ir a hoy" title="Hoy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 7v5l3 3"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="view-toggle">
+      <button data-view="dia" onclick="cambiarVista('dia')">Día</button>
+      <button data-view="semana" class="active" onclick="cambiarVista('semana')">Semana</button>
+      <button data-view="mes" onclick="cambiarVista('mes')">Mes</button>
+    </div>
+
+    <div class="filter-chips">
+      <span class="filter-chip alpadel" id="chipAlpadel" onclick="toggleFiltro('alpadel')">Canchas</span>
+      <span class="filter-chip cotorreo" id="chipCotorreo" onclick="toggleFiltro('cotorreo')">Mesas</span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main class="calendar-main">
+    <div id="calendarBody" class="loading">Cargando…</div>
+  </main>
+
+</div>
+
+<!-- ============ MODAL DETALLES ============ -->
+<div class="modal-overlay" id="modalDetalles">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="detalleTitulo">Reserva</div>
+      <button class="modal-close" onclick="cerrarModal('modalDetalles')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" id="detalleBody"></div>
+    <div class="modal-actions" id="detalleAcciones"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL CREAR ============ -->
+<div class="modal-overlay" id="modalCrear">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nueva reserva</div>
+      <button class="modal-close" onclick="cerrarModal('modalCrear')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-create-tipo="alpadel" onclick="cambiarTipoCrear('alpadel')">Cancha</button>
+      <button class="modal-tab" data-create-tipo="cotorreo" onclick="cambiarTipoCrear('cotorreo')">Mesa</button>
+    </div>
+    <div class="modal-body" id="crearBody"></div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+if (!requireRole(["lili", "gerencia", "saloneros"])) throw new Error("Sin permiso");
+
+const user = getUser();
+document.getElementById("headerUser").textContent = user.nombre + " · " + user.rol;
+
+// ============ ESTADO ============
+const state = {
+  vista: "semana",          // 'dia' | 'semana' | 'mes'
+  fecha: new Date(),        // fecha ancla
+  filtros: { alpadel: true, cotorreo: true },
+  reservas: { alpadel: [], cotorreo: [] },
+};
+
+const NOMBRES_DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const NOMBRES_DIAS_COMPLETO = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const NOMBRES_MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const HORAS_OPERATIVAS = []; // 07:00 a 22:00 cada hora
+for (let i = 7; i <= 22; i++) HORAS_OPERATIVAS.push(i);
+
+// ============ HELPERS DE FECHA (zona CR) ============
+function isoCR(d) {
+  // d es Date local en UTC. Devuelve YYYY-MM-DD en CR
+  const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+  return cr.toISOString().slice(0, 10);
+}
+
+function parseISO(s) {
+  return new Date(s);
+}
+
+function mismoDia(a, b) {
+  return isoCR(a) === isoCR(b);
+}
+
+function inicioSemana(d) {
+  // Lunes como inicio
+  const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+  const dia = cr.getUTCDay() || 7; // domingo=0->7
+  const diff = dia - 1;
+  const lunes = new Date(d);
+  lunes.setUTCHours(0, 0, 0, 0);
+  lunes.setUTCDate(lunes.getUTCDate() - diff);
+  return lunes;
+}
+
+function inicioMes(d) {
+  const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+  const start = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), 1));
+  return start;
+}
+
+function finMes(d) {
+  const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+  const fin = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth() + 1, 0));
+  return fin;
+}
+
+function sumarDias(d, n) {
+  const x = new Date(d);
+  x.setUTCDate(x.getUTCDate() + n);
+  return x;
+}
+
+function fmtDia(d) {
+  const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+  return cr.getUTCDate();
+}
+
+function horaCR(iso) {
+  // Devuelve hora en CR (UTC-6)
+  const d = new Date(iso);
+  const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+  return { h: cr.getUTCHours(), m: cr.getUTCMinutes() };
+}
+
+function fmtHora(iso) {
+  const { h, m } = horaCR(iso);
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+}
+
+// ============ NAVEGACIÓN ============
+function navegar(dir) {
+  if (state.vista === "dia") state.fecha = sumarDias(state.fecha, dir);
+  else if (state.vista === "semana") state.fecha = sumarDias(state.fecha, dir * 7);
+  else if (state.vista === "mes") {
+    const cr = new Date(state.fecha.getTime() - 6 * 3600 * 1000);
+    state.fecha = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth() + dir, 15));
+  }
+  cargarYrender();
+}
+
+function irHoy() {
+  state.fecha = new Date();
+  cargarYrender();
+}
+
+function cambiarVista(v) {
+  state.vista = v;
+  document.querySelectorAll(".view-toggle button").forEach(b => {
+    b.classList.toggle("active", b.dataset.view === v);
+  });
+  cargarYrender();
+}
+
+function toggleFiltro(tipo) {
+  state.filtros[tipo] = !state.filtros[tipo];
+  document.getElementById("chip" + tipo[0].toUpperCase() + tipo.slice(1)).classList.toggle("disabled", !state.filtros[tipo]);
+  render();
+}
+
+// ============ CARGA DE DATOS ============
+function rangoActual() {
+  if (state.vista === "dia") {
+    const f = isoCR(state.fecha);
+    return { desde: f, hasta: f };
+  }
+  if (state.vista === "semana") {
+    const lun = inicioSemana(state.fecha);
+    return { desde: isoCR(lun), hasta: isoCR(sumarDias(lun, 6)) };
+  }
+  if (state.vista === "mes") {
+    // Mostrar mes completo + relleno (max 6 semanas = 42 días)
+    const ini = inicioMes(state.fecha);
+    const lunInicio = inicioSemana(ini);
+    const finRango = sumarDias(lunInicio, 41);
+    return { desde: isoCR(lunInicio), hasta: isoCR(finRango) };
+  }
+}
+
+async function cargarYrender() {
+  document.getElementById("calendarBody").innerHTML = '<div class="loading">Cargando…</div>';
+  const { desde, hasta } = rangoActual();
+  try {
+    const data = await api("GET", `/api/reservas/calendario?desde=${desde}&hasta=${hasta}`);
+    state.reservas = { alpadel: data.alpadel, cotorreo: data.cotorreo };
+    render();
+  } catch (e) {
+    document.getElementById("calendarBody").innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+// ============ RENDER ============
+function render() {
+  actualizarTituloRango();
+  if (state.vista === "dia") renderDia();
+  else if (state.vista === "semana") renderSemana();
+  else if (state.vista === "mes") renderMes();
+}
+
+function actualizarTituloRango() {
+  const r = rangoActual();
+  if (state.vista === "dia") {
+    const d = parseISO(r.desde + "T12:00:00Z");
+    const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+    document.getElementById("dateRange").textContent =
+      `${NOMBRES_DIAS_COMPLETO[(cr.getUTCDay() || 7) - 1]} ${cr.getUTCDate()} de ${NOMBRES_MESES[cr.getUTCMonth()]}`;
+  } else if (state.vista === "semana") {
+    const ini = parseISO(r.desde + "T12:00:00Z");
+    const fin = parseISO(r.hasta + "T12:00:00Z");
+    const crI = new Date(ini.getTime() - 6 * 3600 * 1000);
+    const crF = new Date(fin.getTime() - 6 * 3600 * 1000);
+    document.getElementById("dateRange").textContent =
+      `${crI.getUTCDate()} ${NOMBRES_MESES[crI.getUTCMonth()].slice(0,3)} – ${crF.getUTCDate()} ${NOMBRES_MESES[crF.getUTCMonth()].slice(0,3)}`;
+  } else {
+    const cr = new Date(state.fecha.getTime() - 6 * 3600 * 1000);
+    document.getElementById("dateRange").textContent =
+      `${NOMBRES_MESES[cr.getUTCMonth()]} ${cr.getUTCFullYear()}`;
+  }
+}
+
+function reservasDelDia(fechaIso) {
+  const al = state.filtros.alpadel ? state.reservas.alpadel.filter(r => isoCR(parseISO(r.fechaHora)) === fechaIso) : [];
+  const co = state.filtros.cotorreo ? state.reservas.cotorreo.filter(r => isoCR(parseISO(r.fechaHora)) === fechaIso) : [];
+  return { al, co };
+}
+
+// ====== VISTA SEMANA ======
+function renderSemana() {
+  const lun = inicioSemana(state.fecha);
+  const hoyIso = isoCR(new Date());
+
+  let html = '<div class="week-grid">';
+  // Header columna izquierda
+  html += '<div class="week-day-header"></div>';
+  for (let i = 0; i < 7; i++) {
+    const d = sumarDias(lun, i);
+    const dIso = isoCR(d);
+    const esHoy = dIso === hoyIso ? "today" : "";
+    html += `<div class="week-day-header ${esHoy}">
+      <div class="week-day-name">${NOMBRES_DIAS[i]}</div>
+      <div class="week-day-num">${fmtDia(d)}</div>
+    </div>`;
+  }
+
+  // Filas de horas
+  for (const h of HORAS_OPERATIVAS) {
+    html += `<div class="week-hour-label">${String(h).padStart(2,"0")}:00</div>`;
+    for (let i = 0; i < 7; i++) {
+      const d = sumarDias(lun, i);
+      const dIso = isoCR(d);
+      const esHoy = dIso === hoyIso ? "today" : "";
+      html += `<div class="week-cell ${esHoy}" data-fecha="${dIso}" data-hora="${h}" onclick="crearEnSlot('${dIso}', ${h})"></div>`;
+    }
+  }
+  html += '</div>';
+
+  document.getElementById("calendarBody").innerHTML = html;
+
+  // Pintar bloques de reservas (absolute positioned)
+  setTimeout(() => {
+    for (let i = 0; i < 7; i++) {
+      const d = sumarDias(lun, i);
+      const dIso = isoCR(d);
+      const { al, co } = reservasDelDia(dIso);
+      [...al.map(r => ({...r, tipo: 'alpadel'})), ...co.map(r => ({...r, tipo: 'cotorreo'}))].forEach(r => {
+        pintarBloqueSemana(r, i, lun);
+      });
+    }
+  }, 0);
+}
+
+function pintarBloqueSemana(r, colIdx, lun) {
+  const { h, m } = horaCR(r.fechaHora);
+  if (h < 7 || h > 22) return;
+  const dur = r.tipo === "alpadel" ? (r.duracion || 1) : 1.5; // mesas asumir 1.5h ventana
+  const topPx = (h - 7) * 48 + (m / 60) * 48;
+  const heightPx = dur * 48 - 4;
+
+  const cells = document.querySelectorAll(`.week-cell[data-fecha="${isoCR(sumarDias(lun, colIdx))}"][data-hora="${h}"]`);
+  const targetCell = cells[0];
+  if (!targetCell) return;
+
+  // Construir bloque
+  const block = document.createElement("div");
+  const estadoCls = (r.estado || "").toLowerCase() === "no-show" ? "estado-noshow"
+                 : (r.estado || "").toLowerCase() === "completada" ? "estado-completada" : "";
+  block.className = `reserva-block ${r.tipo} ${estadoCls}`;
+  block.style.top = (m / 60) * 48 + "px";
+  block.style.height = heightPx + "px";
+  block.innerHTML = `
+    <div class="reserva-block-name">${r.nombre || "—"}</div>
+    <div class="reserva-block-meta">${r.tipo === "alpadel" ? (r.cancha || "") : ((r.personas||"?") + " pax")}</div>
+  `;
+  block.onclick = (e) => { e.stopPropagation(); abrirDetalle(r); };
+  targetCell.appendChild(block);
+}
+
+// ====== VISTA DÍA ======
+function renderDia() {
+  const dIso = isoCR(state.fecha);
+  const { al, co } = reservasDelDia(dIso);
+
+  let cols = 0;
+  if (state.filtros.alpadel) cols += 2; // 2 canchas
+  if (state.filtros.cotorreo) cols += 1; // 1 columna mesas
+  if (cols === 0) {
+    document.getElementById("calendarBody").innerHTML = '<div class="loading">Activá al menos un filtro arriba</div>';
+    return;
+  }
+
+  let html = `<div class="day-grid ${!state.filtros.cotorreo ? "no-cotorreo" : ""} ${!state.filtros.alpadel ? "no-alpadel" : ""}">`;
+  html += `<div class="day-col-header"></div>`;
+  if (state.filtros.alpadel) {
+    html += `<div class="day-col-header alpadel">Cancha 1 · Dobles</div>`;
+    html += `<div class="day-col-header alpadel">Cancha 2 · Singles</div>`;
+  }
+  if (state.filtros.cotorreo) {
+    html += `<div class="day-col-header cotorreo">Mesas</div>`;
+  }
+
+  // Slots de 30 min
+  for (let h = 7; h <= 22; h++) {
+    for (const minSlot of [0, 30]) {
+      if (h === 22 && minSlot === 30) continue;
+      html += `<div class="week-hour-label">${String(h).padStart(2,"0")}:${String(minSlot).padStart(2,"0")}</div>`;
+      if (state.filtros.alpadel) {
+        html += `<div class="day-cell" data-cancha="Dobles" data-hora="${h}" data-min="${minSlot}" onclick="crearEnSlot('${dIso}', ${h}, ${minSlot}, 'alpadel', 'Dobles')"></div>`;
+        html += `<div class="day-cell" data-cancha="Singles" data-hora="${h}" data-min="${minSlot}" onclick="crearEnSlot('${dIso}', ${h}, ${minSlot}, 'alpadel', 'Singles')"></div>`;
+      }
+      if (state.filtros.cotorreo) {
+        html += `<div class="day-cell" data-tipo="cotorreo" data-hora="${h}" data-min="${minSlot}" onclick="crearEnSlot('${dIso}', ${h}, ${minSlot}, 'cotorreo')"></div>`;
+      }
+    }
+  }
+  html += '</div>';
+  document.getElementById("calendarBody").innerHTML = html;
+
+  setTimeout(() => {
+    al.forEach(r => pintarBloqueDia(r, 'alpadel'));
+    co.forEach(r => pintarBloqueDia(r, 'cotorreo'));
+  }, 0);
+}
+
+function pintarBloqueDia(r, tipo) {
+  const { h, m } = horaCR(r.fechaHora);
+  if (h < 7 || h > 22) return;
+  const dur = tipo === "alpadel" ? (r.duracion || 1) : 1.5;
+  const slotHeight = 32;
+
+  let selector;
+  if (tipo === "alpadel") selector = `.day-cell[data-cancha="${r.cancha}"][data-hora="${h}"][data-min="${m >= 30 ? 30 : 0}"]`;
+  else selector = `.day-cell[data-tipo="cotorreo"][data-hora="${h}"][data-min="${m >= 30 ? 30 : 0}"]`;
+
+  const cell = document.querySelector(selector);
+  if (!cell) return;
+
+  const block = document.createElement("div");
+  const estadoCls = (r.estado || "").toLowerCase() === "no-show" ? "estado-noshow"
+                 : (r.estado || "").toLowerCase() === "completada" ? "estado-completada" : "";
+  block.className = `reserva-block ${tipo} ${estadoCls}`;
+  block.style.top = ((m % 30) / 30) * slotHeight + "px";
+  block.style.height = (dur * 2 * slotHeight) - 4 + "px";
+  block.innerHTML = `
+    <div class="reserva-block-name">${r.nombre || "—"}</div>
+    <div class="reserva-block-meta">${tipo === "alpadel" ? `${dur}h` : ((r.personas||"?") + " pax")}</div>
+  `;
+  block.onclick = (e) => { e.stopPropagation(); abrirDetalle({...r, tipo}); };
+  cell.appendChild(block);
+}
+
+// ====== VISTA MES ======
+function renderMes() {
+  const ini = inicioMes(state.fecha);
+  const lun = inicioSemana(ini);
+  const mesActual = (new Date(state.fecha.getTime() - 6 * 3600 * 1000)).getUTCMonth();
+  const hoyIso = isoCR(new Date());
+
+  let html = '<div class="month-grid">';
+  NOMBRES_DIAS.forEach(n => html += `<div class="month-day-name">${n}</div>`);
+
+  for (let i = 0; i < 42; i++) {
+    const d = sumarDias(lun, i);
+    const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+    const esOtroMes = cr.getUTCMonth() !== mesActual;
+    const dIso = isoCR(d);
+    const esHoy = dIso === hoyIso;
+    const { al, co } = reservasDelDia(dIso);
+
+    html += `<div class="month-day ${esOtroMes ? "other-month" : ""} ${esHoy ? "today" : ""}" onclick="abrirDia('${dIso}')">
+      <div class="month-day-num">${fmtDia(d)}</div>
+      <div class="month-counts">
+        ${al.length > 0 ? `<span class="month-count alpadel">${al.length} cancha${al.length>1?"s":""}</span>` : ""}
+        ${co.length > 0 ? `<span class="month-count cotorreo">${co.length} mesa${co.length>1?"s":""}</span>` : ""}
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById("calendarBody").innerHTML = html;
+}
+
+function abrirDia(fechaIso) {
+  state.fecha = parseISO(fechaIso + "T12:00:00Z");
+  cambiarVista("dia");
+}
+
+// ============ MODAL DETALLES ============
+function abrirDetalle(r) {
+  const tipo = r.tipo;
+  document.getElementById("detalleTitulo").textContent =
+    tipo === "alpadel" ? `Cancha ${r.cancha === "Dobles" ? "1" : "2"} · ${r.cancha}` : "Mesa Plaza Cotorreo";
+
+  const fechaTxt = new Date(r.fechaHora).toLocaleDateString("es-MX", {
+    weekday: "long", day: "numeric", month: "long", timeZone: "America/Costa_Rica",
+  });
+
+  const items = [
+    { l: "Cliente", v: r.nombre || "—" },
+    { l: "Fecha", v: fechaTxt },
+    { l: "Hora", v: fmtHora(r.fechaHora) + (r.horaFin ? " – " + fmtHora(r.horaFin) : "") },
+  ];
+  if (tipo === "alpadel") {
+    items.push({ l: "Cancha", v: r.cancha || "—" });
+    items.push({ l: "Duración", v: (r.duracion || 1) + "h" });
+    items.push({ l: "Tipo", v: r.tipo || "Regular" });
+  } else {
+    items.push({ l: "Personas", v: r.personas || "—" });
+    if (r.ocasion && r.ocasion !== "Ninguna") items.push({ l: "Ocasión", v: r.ocasion });
+    if (r.area) items.push({ l: "Área", v: r.area });
+  }
+  if (r.notas) items.push({ l: "Notas", v: r.notas });
+  if (r.telefono) items.push({ l: "Teléfono", v: r.telefono });
+  if (r.precio) items.push({ l: "Precio", v: "₡" + r.precio.toLocaleString("es-MX") });
+  items.push({ l: "Estado", v: r.estado || "Confirmada" });
+
+  document.getElementById("detalleBody").innerHTML = items.map(i =>
+    `<div class="detail-row"><span class="detail-label">${i.l}</span><span class="detail-value">${i.v}</span></div>`
+  ).join("");
+
+  const apiTipo = tipo === "alpadel" ? "alpadel" : "cotorreo";
+  document.getElementById("detalleAcciones").innerHTML = `
+    <button class="btn btn-success" onclick="cambiarEstado('${apiTipo}', '${r.id}', 'Completada')">Llegó</button>
+    <button class="btn btn-warn" onclick="cambiarEstado('${apiTipo}', '${r.id}', 'No-show')">No-show</button>
+    <button class="btn btn-danger" onclick="cambiarEstado('${apiTipo}', '${r.id}', 'Cancelada')">Cancelar</button>
+  `;
+
+  document.getElementById("modalDetalles").classList.add("visible");
+}
+
+async function cambiarEstado(tipo, id, estado) {
+  try {
+    await api("PATCH", `/api/reservas/${tipo}/${id}/estado`, { estado });
+    cerrarModal("modalDetalles");
+    cargarYrender();
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+// ============ MODAL CREAR ============
+let crearTipo = "alpadel";
+let crearFechaPreRellena = null;
+let crearHoraPreRellena = null;
+let crearCanchaPreRellena = null;
+let clienteSelCrear = null;
+
+function crearEnSlot(fechaIso, hora, min, tipo, cancha) {
+  crearFechaPreRellena = fechaIso;
+  crearHoraPreRellena = hora * 60 + (min || 0);
+  crearCanchaPreRellena = cancha || null;
+  crearTipo = tipo || "alpadel";
+  cambiarTipoCrear(crearTipo);
+  document.getElementById("modalCrear").classList.add("visible");
+}
+
+function cambiarTipoCrear(tipo) {
+  crearTipo = tipo;
+  clienteSelCrear = null;
+  document.querySelectorAll(".modal-tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.createTipo === tipo);
+  });
+
+  const fechaIso = crearFechaPreRellena || isoCR(state.fecha);
+  const horaStr = crearHoraPreRellena !== null
+    ? `${String(Math.floor(crearHoraPreRellena/60)).padStart(2,"0")}:${String(crearHoraPreRellena%60).padStart(2,"0")}`
+    : "10:00";
+
+  const fechaHoraStr = `${fechaIso}T${horaStr}`;
+
+  let html = `
+    <div class="form-group">
+      <label class="form-label">Buscar cliente existente</label>
+      <input type="text" class="input" id="crearBuscar" placeholder="Nombre o teléfono" oninput="buscarClienteCrear()">
+      <div id="crearResultados" style="margin-top: 6px;"></div>
+    </div>
+    <div id="crearClienteSel" style="display:none; padding:10px; background: var(--color-success-bg); border-radius: 8px; margin-bottom: 14px; font-size: 13px;">
+      <strong id="crearClienteNombre"></strong>
+      <button type="button" style="margin-left: 8px; background: none; border: none; color: var(--color-primary); cursor: pointer; font-weight: 600;" onclick="limpiarClienteCrear()">Cambiar</button>
+    </div>
+    <div id="crearClienteNuevo">
+      <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="input" id="crear-nombre"></div>
+      <div class="form-group"><label class="form-label">Teléfono *</label><input type="tel" class="input" id="crear-telefono"></div>
+      <div class="form-group"><label class="form-label">Email *</label><input type="email" class="input" id="crear-email"></div>
+      <div class="form-group">
+        <label class="form-label">Cumpleaños * (día y mes)</label>
+        <div style="display:flex; gap:8px;">
+          <select class="select" id="crear-cumpleDia" style="flex:1;">${diasOpts()}</select>
+          <select class="select" id="crear-cumpleMes" style="flex:2;">${mesesOpts()}</select>
+        </div>
+      </div>
+    </div>
+    <hr style="margin: 14px 0; border: none; border-top: 1px solid var(--border-subtle);">
+  `;
+
+  if (tipo === "alpadel") {
+    html += `
+      <div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="input" id="crear-fecha" value="${fechaIso}"></div>
+      <div class="form-group"><label class="form-label">Hora *</label><input type="time" class="input" id="crear-hora" value="${horaStr}"></div>
+      <div class="form-group"><label class="form-label">Duración *</label><select class="select" id="crear-duracion">
+        <option value="0.5">30 min</option><option value="1" selected>1h</option>
+        <option value="1.5">1h 30</option><option value="2">2h</option>
+        <option value="2.5">2h 30</option><option value="3">3h</option>
+      </select></div>
+      <div class="form-group"><label class="form-label">Cancha *</label><select class="select" id="crear-cancha">
+        <option value="Dobles" ${crearCanchaPreRellena === "Dobles" ? "selected" : ""}>Cancha 1 — Dobles</option>
+        <option value="Singles" ${crearCanchaPreRellena === "Singles" ? "selected" : ""}>Cancha 2 — Singles</option>
+      </select></div>
+      <div class="form-group"><label class="form-label">Notas</label><input type="text" class="input" id="crear-notas"></div>
+      <button class="btn-create" onclick="submitCrearAlpadel()">Crear reserva</button>
+    `;
+  } else {
+    html += `
+      <div class="form-group"><label class="form-label">Fecha y hora *</label><input type="datetime-local" class="input" id="crear-fechahora" value="${fechaHoraStr}"></div>
+      <div class="form-group"><label class="form-label">Personas *</label><input type="number" class="input" id="crear-personas" min="1" max="20"></div>
+      <div class="form-group"><label class="form-label">Ocasión</label><select class="select" id="crear-ocasion">
+        <option value="Ninguna">Ninguna</option><option value="Cumpleanos">Cumpleaños</option>
+        <option value="Aniversario">Aniversario</option><option value="Familiar">Familiar</option>
+        <option value="Negocios">Negocios</option><option value="Otra">Otra</option>
+      </select></div>
+      <div class="form-group"><label class="form-label">Área</label><select class="select" id="crear-area">
+        <option value="">Sin preferencia</option>
+        <option>Planta baja</option><option>Planta alta</option>
+        <option>Cerca del playground</option>
+        <option>Planta alta pasillo con vista al arroyo</option>
+        <option>Balcón por pool</option><option>Sillas moradas</option>
+      </select></div>
+      <div class="form-group"><label class="form-label">Notas</label><input type="text" class="input" id="crear-notas"></div>
+      <button class="btn-create" onclick="submitCrearCotorreo()">Crear reserva</button>
+    `;
+  }
+
+  document.getElementById("crearBody").innerHTML = html;
+}
+
+function diasOpts() {
+  let h = '<option value="">Día</option>';
+  for (let i = 1; i <= 31; i++) h += `<option value="${String(i).padStart(2,"0")}">${i}</option>`;
+  return h;
+}
+function mesesOpts() {
+  const m = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  let h = '<option value="">Mes</option>';
+  m.forEach((n, i) => h += `<option value="${String(i+1).padStart(2,"0")}">${n}</option>`);
+  return h;
+}
+
+async function buscarClienteCrear() {
+  const q = document.getElementById("crearBuscar").value;
+  if (q.length < 2) { document.getElementById("crearResultados").innerHTML = ""; return; }
+  try {
+    const r = await api("GET", `/api/clientes/buscar?q=${encodeURIComponent(q)}`);
+    if (!r.clientes.length) {
+      document.getElementById("crearResultados").innerHTML = "<small style='color: var(--text-tertiary)'>No hay resultados. Llená los datos abajo.</small>";
+      return;
+    }
+    document.getElementById("crearResultados").innerHTML = r.clientes.map(c => `
+      <div onclick="seleccionarClienteCrear('${c.id}','${(c.nombre||'').replace(/'/g,"\\'")}','${c.telefono||''}')"
+        style="padding: 8px; border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 4px; cursor: pointer;">
+        <strong>${c.nombre}</strong> · ${c.telefono || ""}
+      </div>
+    `).join("");
+  } catch (e) { console.error(e); }
+}
+
+function seleccionarClienteCrear(id, nombre, telefono) {
+  clienteSelCrear = { id, nombre, telefono };
+  document.getElementById("crearClienteSel").style.display = "block";
+  document.getElementById("crearClienteNombre").textContent = `${nombre} (${telefono})`;
+  document.getElementById("crearClienteNuevo").style.display = "none";
+  document.getElementById("crearResultados").innerHTML = "";
+  document.getElementById("crearBuscar").value = "";
+}
+
+function limpiarClienteCrear() {
+  clienteSelCrear = null;
+  document.getElementById("crearClienteSel").style.display = "none";
+  document.getElementById("crearClienteNuevo").style.display = "block";
+}
+
+function datosClienteCrear() {
+  if (clienteSelCrear) {
+    return { clienteId: clienteSelCrear.id, nombre: clienteSelCrear.nombre, telefono: clienteSelCrear.telefono };
+  }
+  return {
+    nombre: document.getElementById("crear-nombre").value.trim(),
+    telefono: document.getElementById("crear-telefono").value.trim(),
+    email: document.getElementById("crear-email").value.trim(),
+    cumpleanosDia: document.getElementById("crear-cumpleDia").value,
+    cumpleanosMes: document.getElementById("crear-cumpleMes").value,
+  };
+}
+
+async function submitCrearAlpadel() {
+  const data = Object.assign(datosClienteCrear(), {
+    fecha: document.getElementById("crear-fecha").value,
+    hora: document.getElementById("crear-hora").value,
+    duracion: parseFloat(document.getElementById("crear-duracion").value),
+    cancha: document.getElementById("crear-cancha").value,
+    tipo: "Regular",
+    notas: document.getElementById("crear-notas").value,
+  });
+  if (!data.nombre || !data.telefono || !data.fecha || !data.hora) {
+    return alert("Faltan datos básicos");
+  }
+  try {
+    await api("POST", "/api/reservas/alpadel/manual", data);
+    cerrarModal("modalCrear");
+    cargarYrender();
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+async function submitCrearCotorreo() {
+  const data = Object.assign(datosClienteCrear(), {
+    fechaHora: document.getElementById("crear-fechahora").value,
+    personas: parseInt(document.getElementById("crear-personas").value),
+    ocasion: document.getElementById("crear-ocasion").value,
+    area: document.getElementById("crear-area").value,
+    notas: document.getElementById("crear-notas").value,
+  });
+  if (!data.nombre || !data.telefono || !data.fechaHora || !data.personas) {
+    return alert("Faltan datos básicos");
+  }
+  try {
+    await api("POST", "/api/reservas/cotorreo/manual", data);
+    cerrarModal("modalCrear");
+    cargarYrender();
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+// ============ HELPERS GENERALES ============
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove("visible");
+}
+
+function volver() {
+  const rolPath = {
+    gerencia: "/gerencia.html",
+    lili: "/lili.html",
+    saloneros: "/restaurante.html",
+  };
+  window.location.href = rolPath[user.rol] || "/";
+}
+
+// Click fuera del modal cierra
+document.querySelectorAll(".modal-overlay").forEach(o => {
+  o.addEventListener("click", (e) => {
+    if (e.target === o) o.classList.remove("visible");
+  });
+});
+
+// Init
+cargarYrender();
+</script>
+
+</body>
+</html>

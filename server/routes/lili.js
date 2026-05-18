@@ -111,6 +111,44 @@ function simplifyCotorreo(r) {
 }
 
 // ===========================
+// GET /api/reservas/calendario?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+// Devuelve { alpadel: [], cotorreo: [], desde, hasta }
+// Excluye reservas Canceladas para no llenar el calendario de ruido
+// ===========================
+router.get("/reservas/calendario", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    const desde = req.query.desde || todayCR();
+    const hasta = req.query.hasta || desde;
+    const ini = startOfDayCR(desde);
+    const fin = endOfDayCR(hasta);
+
+    const formAl = `AND(IS_AFTER({Fecha y hora inicio}, '${ini}'), IS_BEFORE({Fecha y hora inicio}, '${fin}'), {Estado} != 'Cancelada')`;
+    const formCo = `AND(IS_AFTER({Fecha y hora}, '${ini}'), IS_BEFORE({Fecha y hora}, '${fin}'), {Estado} != 'Cancelada')`;
+
+    const [al, co] = await Promise.all([
+      list(TABLES.ReservasAlpadel, {
+        filterByFormula: formAl,
+        sort: [{ field: "Fecha y hora inicio", direction: "asc" }],
+      }),
+      list(TABLES.ReservasCotorreo, {
+        filterByFormula: formCo,
+        sort: [{ field: "Fecha y hora", direction: "asc" }],
+      }),
+    ]);
+
+    res.json({
+      desde,
+      hasta,
+      alpadel: al.records.map(simplifyAlpadel),
+      cotorreo: co.records.map(simplifyCotorreo),
+    });
+  } catch (e) {
+    console.error("GET /reservas/calendario", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
 // PATCH /api/reservas/:tipo/:id/estado
 // Body: { estado: "Completada" | "No-show" | "Cancelada" | "Confirmada" }
 // ===========================
