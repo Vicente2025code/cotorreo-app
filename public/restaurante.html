@@ -25,6 +25,8 @@
     <button class="tab" data-tab="nueva-mesa">+ Mesa</button>
     <button class="tab" data-tab="nueva-cancha">+ Cancha</button>
     <button class="tab" data-tab="paquetes">Paquetes</button>
+    <button class="tab" data-tab="recurrentes">Recurrentes</button>
+    <button class="tab" data-tab="cumples">Cumples</button>
   </div>
 
   <div class="tab-content active" id="tab-hoy">
@@ -89,6 +91,23 @@
       <div id="paquetes-list" class="loading">Cargando</div>
     </div>
   </div>
+
+  <!-- TAB: RECURRENTES -->
+  <div class="tab-content" id="tab-recurrentes">
+    <div class="card">
+      <h3>🔁 Reservas recurrentes activas</h3>
+      <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()" style="margin-bottom: 12px;">+ Nueva recurrente</button>
+      <div id="recurrentes-list" class="loading">Cargando</div>
+    </div>
+  </div>
+
+  <!-- TAB: CUMPLES -->
+  <div class="tab-content" id="tab-cumples">
+    <div class="card">
+      <h3>🎂 Cumpleañeros del mes</h3>
+      <div id="cumples-list" class="loading">Cargando</div>
+    </div>
+  </div>
 </div>
 
 <script src="/js/common.js"></script>
@@ -104,7 +123,7 @@ for (let i = 7; i <= 22; i++) {
   if (i < 22) horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:30</option>`;
 }
 
-const paquetesCargados = { v: false };
+const cargados = { paquetes: false, recurrentes: false, cumples: false };
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
     if (!btn.dataset.tab) return; // links externos (Calendario)
@@ -112,10 +131,10 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-    if (btn.dataset.tab === "paquetes" && !paquetesCargados.v) {
-      paquetesCargados.v = true;
-      loadPaquetes();
-    }
+    const t = btn.dataset.tab;
+    if (t === "paquetes" && !cargados.paquetes) { cargados.paquetes = true; loadPaquetes(); }
+    if (t === "recurrentes" && !cargados.recurrentes) { cargados.recurrentes = true; loadRecurrentes(); }
+    if (t === "cumples" && !cargados.cumples) { cargados.cumples = true; loadCumples(); }
   });
 });
 
@@ -315,10 +334,55 @@ function abrirCrearPaquete() {
       precioTotal: precio,
     }).then(() => {
       alert("✅ Paquete creado");
-      paquetesCargados.v = false;
+      cargados.paquetes = false;
       loadPaquetes();
     }).catch(e => alert("Error: " + e.message));
   });
+}
+
+// ===== RECURRENTES =====
+async function loadRecurrentes() {
+  try {
+    const data = await api("GET", "/api/recurrentes");
+    if (!data.recurrentes.length) {
+      document.getElementById("recurrentes-list").innerHTML = "<em>Sin recurrentes</em>";
+      return;
+    }
+    document.getElementById("recurrentes-list").innerHTML = data.recurrentes.map(r => `
+      <div class="card" style="margin-bottom: 8px;">
+        <strong>${r.fields.Referencia}</strong><br>
+        ${r.fields["Día semana"]} ${r.fields["Hora inicio"]}-${r.fields["Hora fin"]} · ${r.fields.Cancha}<br>
+        <small>${fmtFechaCorta(r.fields["Fecha inicio"])} al ${fmtFechaCorta(r.fields["Fecha fin"])}</small>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("recurrentes-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+function abrirCrearRecurrente() {
+  alert("Por simplicidad, las recurrentes se crean desde Airtable directo por ahora. Próximamente acá.");
+}
+
+// ===== CUMPLES =====
+async function loadCumples() {
+  try {
+    const data = await api("GET", "/api/cumpleanos/mes");
+    if (!data.clientes.length) {
+      document.getElementById("cumples-list").innerHTML = "<em>Sin cumples este mes</em>";
+      return;
+    }
+    document.getElementById("cumples-list").innerHTML = data.clientes.map(c => `
+      <div class="reserva">
+        <div class="reserva-info">
+          <strong>${c.nombre}</strong><br>
+          <small>${fmtFechaCorta(c.cumpleanos)} · ${c.telefono || ""}</small>
+        </div>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("cumples-list").innerHTML = "Error: " + e.message;
+  }
 }
 
 loadHoy();
