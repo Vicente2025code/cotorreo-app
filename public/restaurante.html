@@ -24,6 +24,7 @@
     <a class="tab" href="/calendario.html" style="text-decoration: none;">📅 Calendario</a>
     <button class="tab" data-tab="nueva-mesa">+ Mesa</button>
     <button class="tab" data-tab="nueva-cancha">+ Cancha</button>
+    <button class="tab" data-tab="paquetes">Paquetes</button>
   </div>
 
   <div class="tab-content active" id="tab-hoy">
@@ -79,6 +80,15 @@
       <button class="btn btn-primary btn-block" onclick="crearCancha()">Crear reserva</button>
     </div>
   </div>
+
+  <!-- TAB: PAQUETES -->
+  <div class="tab-content" id="tab-paquetes">
+    <div class="card">
+      <h3>📦 Paquetes activos</h3>
+      <button class="btn btn-primary btn-sm" onclick="abrirCrearPaquete()" style="margin-bottom: 12px;">+ Vender paquete</button>
+      <div id="paquetes-list" class="loading">Cargando</div>
+    </div>
+  </div>
 </div>
 
 <script src="/js/common.js"></script>
@@ -94,12 +104,18 @@ for (let i = 7; i <= 22; i++) {
   if (i < 22) horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:30</option>`;
 }
 
+const paquetesCargados = { v: false };
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
+    if (!btn.dataset.tab) return; // links externos (Calendario)
     document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "paquetes" && !paquetesCargados.v) {
+      paquetesCargados.v = true;
+      loadPaquetes();
+    }
   });
 });
 
@@ -263,6 +279,46 @@ async function crearCancha() {
     document.querySelector('[data-tab="hoy"]').click();
     loadHoy();
   } catch (e) { alert(e.message); }
+}
+
+// ===== PAQUETES =====
+async function loadPaquetes() {
+  try {
+    const data = await api("GET", "/api/paquetes");
+    if (!data.paquetes.length) {
+      document.getElementById("paquetes-list").innerHTML = "<em>Sin paquetes activos</em>";
+      return;
+    }
+    document.getElementById("paquetes-list").innerHTML = data.paquetes.map(p => `
+      <div class="card" style="margin-bottom: 8px;">
+        <strong>${p.referencia}</strong><br>
+        <small>${p.horasRestantes} de ${p.horasCompradas}h restantes · vence ${fmtFechaCorta(p.fechaVencimiento)}</small><br>
+        <span class="badge confirmada">${p.estado}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("paquetes-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+function abrirCrearPaquete() {
+  const tel = prompt("Teléfono del cliente:");
+  if (!tel) return;
+  const horas = prompt("Horas (3, 5 o 10):");
+  const precio = horas === "3" ? 30000 : horas === "5" ? 47500 : horas === "10" ? 90000 : null;
+  if (!precio) return alert("Solo 3, 5 o 10 horas");
+  api("GET", `/api/clientes/buscar?q=${tel}`).then(r => {
+    if (!r.clientes.length) return alert("Cliente no encontrado. Crea una reserva primero para registrarlo.");
+    api("POST", "/api/paquetes", {
+      clienteId: r.clientes[0].id,
+      horasCompradas: parseInt(horas),
+      precioTotal: precio,
+    }).then(() => {
+      alert("✅ Paquete creado");
+      paquetesCargados.v = false;
+      loadPaquetes();
+    }).catch(e => alert("Error: " + e.message));
+  });
 }
 
 loadHoy();
