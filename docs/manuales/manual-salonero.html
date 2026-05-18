@@ -12,7 +12,7 @@
 
   <header class="manual-header">
     <div class="manual-header-brand">
-      <img src="../../public/assets/logos/grupo-cotorreo.png" alt="Grupo Cotorreo" class="manual-header-logo">
+      <img src="/assets/logos/grupo-cotorreo.png" alt="Grupo Cotorreo" class="manual-header-logo">
       <div>
         <div class="manual-header-title">Manual del sistema</div>
         <div class="manual-header-subtitle">Operación Restaurante · v1.0 (mayo 2026)</div>
@@ -54,17 +54,26 @@
   <section class="step">
     <h2 class="step-title"><span class="step-num">2</span>Qué vas a ver</h2>
     <div class="step-body">
-      <p>El panel tiene <strong>3 pestañas</strong>:</p>
+      <p>El panel tiene <strong>7 pestañas</strong>:</p>
 
       <div class="tabs-preview">
         <span class="tab-chip active">Hoy</span>
+        <span class="tab-chip">Calendario</span>
         <span class="tab-chip">+ Mesa</span>
         <span class="tab-chip">+ Cancha</span>
+        <span class="tab-chip">Paquetes</span>
+        <span class="tab-chip">Recurrentes</span>
+        <span class="tab-chip">Cumples</span>
       </div>
 
       <div class="action-card">
         <div class="action-card-title">Hoy</div>
         <div class="action-card-body">Las reservas del día. Arriba <strong>Cotorreo</strong> (mesas del restaurante), abajo <strong>Alpadel</strong> (canchas). Cada reserva tiene 3 botones para marcar qué pasó.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Calendario</div>
+        <div class="action-card-body">Vista visual de todas las reservas con 3 modos: <strong>Día</strong>, <strong>Semana</strong> o <strong>Mes</strong>. Verde = canchas, magenta = mesas. Tocá en un hueco vacío para crear una reserva ahí mismo.</div>
       </div>
 
       <div class="action-card">
@@ -74,7 +83,22 @@
 
       <div class="action-card">
         <div class="action-card-title">+ Cancha</div>
-        <div class="action-card-body">Crear reserva de cancha si por casualidad un cliente te pregunta y la app del cliente no le funciona.</div>
+        <div class="action-card-body">Crear reserva de cancha si un cliente te pregunta y la app del cliente no le funciona.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Paquetes</div>
+        <div class="action-card-body">Vender paquetes de canchas (3, 5 o 10 horas). El cliente debe estar ya registrado (tener al menos una reserva previa).</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Recurrentes</div>
+        <div class="action-card-body">Clientes que tienen reserva fija semanal (ej. todos los martes 7pm). Solo lectura por ahora — las recurrentes se crean desde Airtable.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Cumples</div>
+        <div class="action-card-body">Cumpleañeros del mes. Útil para reconocerlos cuando vengan al restaurante o cancha y prepararles algo especial.</div>
       </div>
     </div>
   </section>
@@ -123,6 +147,30 @@
       <div class="action-card">
         <div class="action-card-title">Saber si alguien viene a celebrar cumpleaños</div>
         <div class="action-card-body">En pestaña <strong>Hoy</strong>, las reservas con ocasión "Cumpleaños" lo muestran junto al nombre. Avisá al maestro/cocina con tiempo para preparar el detalle.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Ver la semana completa de reservas</div>
+        <div class="action-card-body">Pestaña <strong>Calendario</strong> → vista <strong>Semana</strong>. Para ver disponibilidad de canchas o mesas en un día específico, tocá <strong>Día</strong>. Tocá un hueco vacío para reservar directo desde ahí.</div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Vender un paquete de canchas</div>
+        <div class="action-card-body">
+          Pestaña <strong>Paquetes</strong> → <strong>+ Vender paquete</strong>:
+          <ol class="tasks" style="margin-top: 8px;">
+            <li>Pegá el <strong>teléfono</strong> del cliente (debe estar registrado)</li>
+            <li>Elegí <strong>3, 5 o 10 horas</strong></li>
+            <li>El sistema calcula el precio: 3h = ₡30.000 · 5h = ₡47.500 · 10h = ₡90.000</li>
+            <li>Confirmá. El paquete queda activo y el cliente puede usarlo en futuras reservas.</li>
+          </ol>
+          Si el cliente NO está registrado, primero creale una reserva (en + Cancha) y después volvés a Paquetes.
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-card-title">Ver cumpleañeros del mes</div>
+        <div class="action-card-body">Pestaña <strong>Cumples</strong>. Lista de todos los cumpleañeros del mes con nombre y fecha. El sistema les manda felicitación automática el día.</div>
       </div>
 
       <div class="action-card">
