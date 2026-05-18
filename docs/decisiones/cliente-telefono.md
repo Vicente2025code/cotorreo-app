@@ -70,7 +70,7 @@ Asume CR (que es 99% de los casos). Si alguna vez tienes un cliente extranjero, 
 
 ## Cómo verlo
 
-👉 https://cotorreo-app.onrender.com/cliente-telefono.preview.html
+👉 https://reservas.grupocotorreo.com/cliente-telefono.preview.html
 
 ---
 

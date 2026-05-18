@@ -75,7 +75,7 @@ Agregué "Grupo Cotorreo · Ciudad Quesada, San Carlos" como ancla geográfica s
 ## Cómo verlo antes de aprobar
 
 1. Abre en tu compu: `cotorreo-app/public/index.preview.html` (doble click en explorador)
-2. Compara con el actual: https://cotorreo-app.onrender.com/
+2. Compara con el actual: https://reservas.grupocotorreo.com/
 3. Pruébalo en celular: copia el contenido a un archivo, súbelo a tu Drive como HTML y visítalo
 
 O si prefieres, pusheamos el preview a Render como `/index.preview.html` (URL pública) para que veas la versión real con CDN.

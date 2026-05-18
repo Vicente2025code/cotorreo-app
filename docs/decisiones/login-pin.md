@@ -73,7 +73,7 @@ WhatsApp directo a tu número (`+50672882394`). Si quieres que vaya a otro núme
 
 ## Cómo verlo
 
-👉 https://cotorreo-app.onrender.com/login.preview.html
+👉 https://reservas.grupocotorreo.com/login.preview.html
 
 **Para probar:**
 - PIN `1234` → entra como Lili

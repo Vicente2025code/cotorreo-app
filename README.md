@@ -20,7 +20,7 @@ PINs específicos se configuran en variables de entorno del deploy (ver `.env.ex
 - **Storage**: Airtable como backend (vía REST API, PAT del lado servidor)
 - **Auth**: PIN → JWT (válido 24h)
 - **Frontend**: HTML + vanilla JS + CSS, mobile-first
-- **Deploy**: Render — `cotorreo-app.onrender.com`
+- **Deploy**: Render — `reservas.grupocotorreo.com`
 
 ## Variables de entorno
 

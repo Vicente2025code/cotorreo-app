@@ -78,7 +78,7 @@ Argumento: el cliente que llega del bot WhatsApp ya sabe qué quiere reservar. E
 
 ## Cómo verlo
 
-# 👉 https://cotorreo-app.onrender.com/cliente-seleccion.preview.html
+# 👉 https://reservas.grupocotorreo.com/cliente-seleccion.preview.html
 
 (Se va a deployar tras el siguiente push.)
 
