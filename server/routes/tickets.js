@@ -201,57 +201,91 @@ router.post("/tickets/save", requireTicketsAuth, async (req, res) => {
       });
     }
 
-    // Generar un folio único para agrupar este ticket
-    const folio = `TICK-${Date.now().toString().slice(-8)}`;
-
+    // Generar un folio base único para este ticket
+    const folioBase = `TICK-${Date.now().toString().slice(-8)}`;
     const fechaSave = fecha || new Date().toISOString().slice(0, 10);
 
-    // Si hay imagen, la subimos como attachment del primer registro.
-    // Airtable acepta attachments via URL pública o como objeto inline.
-    // Para enviarla inline necesitamos un servicio temporal — uso transfer.sh
-    // o, más simple: subir a Airtable como dataURL no funciona en la API.
-    // Mejor opción: Airtable acepta { url: "..." } y descarga del lado del server.
-    // Para no depender de un host externo, hacemos un endpoint propio que sirva la imagen.
+    // Schema real de tabla Traslados:
+    //   - UN registro por destino (no uno por item)
+    //   - Todos los items del destino se empaquetan en Productos_json (JSON string)
+    //   - Valor_total = suma de subtotales del grupo
+    //   - Estado = "pendiente" (minúscula)
     //
-    // Por simplicidad en esta fase 1: NO adjuntamos la imagen aún. Solo guardamos
-    // los datos. La fase 2 agregará el attachment vía una URL temporal.
+    // Si el ticket tiene items para MÚLTIPLES destinos, creamos varios registros
+    // (uno por destino), todos con el mismo folio base pero con sufijo del destino.
+
+    // Agrupar items por destino
+    const itemsByDestino = {};
+    for (const it of items) {
+      const d = it.destino || "Sin asignar";
+      if (!itemsByDestino[d]) itemsByDestino[d] = [];
+      itemsByDestino[d].push(it);
+    }
+    const destinosCount = Object.keys(itemsByDestino).length;
 
     const creados = [];
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
+    let folioIndex = 0;
+    for (const [destino, itemsList] of Object.entries(itemsByDestino)) {
+      folioIndex++;
+      // Construir el array Productos_json en el formato que usa la app actual
+      // Schema: [{ id, name, unit, qty, price }]
+      const productosJson = itemsList.map((it, idx) => ({
+        id: `tk_${folioBase}_${folioIndex}_${idx}`,
+        name: it.producto || "(sin nombre)",
+        unit: it.unidad || "unidad",
+        qty: Number(it.cantidad) || 1,
+        price: Number(it.precio_unit) || 0,
+      }));
+      const valorTotal = itemsList.reduce(
+        (acc, it) => acc + (Number(it.precio_unit) || 0) * (Number(it.cantidad) || 0),
+        0
+      );
+
+      // Si hay varios destinos, agregar sufijo al folio para diferenciarlos
+      const folioFinal = destinosCount > 1
+        ? `${folioBase}-${folioIndex}`
+        : folioBase;
+
       const fields = {
-        Producto: it.producto || "(sin nombre)",
-        Cantidad: Number(it.cantidad) || 1,
-        Unidad: it.unidad || "unidad",
-        Precio: Number(it.precio_unit) || 0,
-        Destino: it.destino || undefined,
-        Estado: "Pendiente",
-        Fecha: fechaSave,
+        Folio: folioFinal,
         Quien_envia: comercio || "Compra externa",
-        Folio: folio,
-        Notas: [
-          it.notas,
-          notasGlobal,
-          `Ticket de ${comercio || "compra"}`,
-          `Subtotal: ₡${(Number(it.subtotal) || 0).toLocaleString("es-CR")}`,
-        ].filter(Boolean).join(" · "),
+        Destino: destino,
+        Estado: "pendiente",
+        Fecha: fechaSave,
+        Productos_json: JSON.stringify(productosJson),
+        Valor_total: valorTotal,
       };
 
       try {
         const rec = await createTraslado(fields, { typecast: true });
-        creados.push({ id: rec.id, producto: fields.Producto, destino: fields.Destino });
+        creados.push({
+          id: rec.id,
+          folio: folioFinal,
+          destino,
+          items_count: itemsList.length,
+          valor_total: valorTotal,
+        });
       } catch (errItem) {
-        console.error(`Error creando item ${i}:`, errItem.message);
-        creados.push({ error: errItem.message, producto: it.producto });
+        console.error(`Error creando traslado para destino ${destino}:`, errItem.message);
+        creados.push({ error: errItem.message, destino });
       }
     }
 
+    const total_ok = creados.filter(c => !c.error).length;
+    const total_errores = creados.length - total_ok;
+
     res.json({
-      ok: true,
-      folio,
+      ok: total_ok > 0,
+      folio: folioBase,
       creados,
       total_items: items.length,
-      total_ok: creados.filter(c => !c.error).length,
+      total_registros: creados.length,
+      total_ok,
+      total_errores,
+      // Si TODO falló, devolver el primer error para que el frontend lo muestre
+      error: total_ok === 0 && creados[0] && creados[0].error
+        ? creados[0].error
+        : undefined,
     });
   } catch (e) {
     console.error("POST /tickets/save error:", e);
