@@ -14,6 +14,9 @@ const { login } = require("./auth");
 const app = express();
 app.set("trust proxy", true); // para que req.ip funcione bien detrás de Render
 app.use(cors());
+// 1mb default para la mayoría de endpoints (reservas, login, etc).
+// El endpoint /api/tickets/* recibe imágenes base64 (~3-7MB) y monta su
+// propio middleware con limit mayor abajo.
 app.use(express.json({ limit: "1mb" }));
 
 // ===== Auth =====
@@ -32,6 +35,12 @@ app.use("/api", require("./routes/public"));
 app.use("/api", require("./routes/lili"));
 app.use("/api", require("./routes/maestro"));
 app.use("/api", require("./routes/gerencia"));
+
+// Tickets recibe imágenes base64 grandes — body parser dedicado con limit 15mb.
+// Express aplica el middleware MÁS específico primero, así que el JSON 1mb
+// general no aplica para /api/tickets/*.
+app.use("/api/tickets", express.json({ limit: "15mb" }));
+app.use("/api", require("./routes/tickets"));
 
 // ===== Health =====
 app.get("/api/health", (_req, res) => {
