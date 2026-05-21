@@ -246,11 +246,17 @@ router.post("/tickets/save", requireTicketsAuth, async (req, res) => {
         ? `${folioBase}-${folioIndex}`
         : folioBase;
 
+      // Los tickets representan compras YA realizadas — el ticket ES la prueba
+      // de la transacción. Por eso se crean directamente como "confirmado"
+      // (NO "pendiente" como los traslados manuales que esperan recepción humana).
+      const nowISO = new Date().toISOString();
       const fields = {
         Folio: folioFinal,
         Quien_envia: comercio || "Compra externa",
         Destino: destino,
-        Estado: "pendiente",
+        Estado: "confirmado",
+        Confirmado_por: `Ticket digital${comercio ? " (" + comercio.slice(0, 40) + ")" : ""}`,
+        Fecha_confirmacion: nowISO,
         Fecha: fechaSave,
         Productos_json: JSON.stringify(productosJson),
         Valor_total: valorTotal,
