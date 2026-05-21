@@ -27,12 +27,12 @@ const TABLES_T = {
 // Negocios operativos válidos como destino (espejo del frontend de traslados)
 const NEGOCIOS_OPERATIVOS = [
   "Cotorreo Plaza",
-  "Cotorreo Taqueria",
+  "Cotorreo Taquería",
   "Nube",
   "Bebros",
   "Alpadel",
   "Departamentos",
-  "Panaderia",
+  "Panadería",
 ];
 const DESTINOS_CONSUMO_PERSONAL = ["Casa"];
 const TODOS_DESTINOS = [...NEGOCIOS_OPERATIVOS, ...DESTINOS_CONSUMO_PERSONAL];
