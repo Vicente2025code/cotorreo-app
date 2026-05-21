@@ -75,6 +75,22 @@ async function updateTraslado(recordId, fields, options = {}) {
   return callT("PATCH", path, body);
 }
 
+/**
+ * Busca traslados existentes que coincidan con destino + rango de fechas.
+ * Usado para detectar posibles duplicados antes de crear desde un ticket.
+ */
+async function listTrasladosPorDestinoYFecha(destino, fechaIni, fechaFin) {
+  if (!destino || !fechaIni || !fechaFin) return [];
+  // filterByFormula: AND({Destino} = "X", {Fecha} >= ini, {Fecha} <= fin)
+  const formula = `AND({Destino} = "${destino}", IS_AFTER({Fecha}, "${fechaIni}"), IS_BEFORE({Fecha}, "${fechaFin}"))`;
+  const qs = new URLSearchParams({
+    filterByFormula: formula,
+    maxRecords: "20",
+  }).toString();
+  const r = await callT("GET", `${TABLES_T.Traslados}?${qs}`);
+  return r.records || [];
+}
+
 module.exports = {
   TABLES_T,
   NEGOCIOS_OPERATIVOS,
@@ -83,5 +99,6 @@ module.exports = {
   callT,
   createTraslado,
   updateTraslado,
+  listTrasladosPorDestinoYFecha,
   isConfigured() { return !!(BASE && PAT); },
 };

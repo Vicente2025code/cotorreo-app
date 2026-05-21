@@ -17,6 +17,7 @@ const {
   NEGOCIOS_OPERATIVOS,
   callT,
   createTraslado,
+  listTrasladosPorDestinoYFecha,
   isConfigured,
 } = require("../airtableTraslados");
 
@@ -185,7 +186,16 @@ router.post("/tickets/save", requireTicketsAuth, async (req, res) => {
       return res.status(500).json({ error: "Airtable Traslados no configurado en el servidor" });
     }
 
-    const { comercio, fecha, items, imageBase64, notas: notasGlobal } = req.body || {};
+    const {
+      comercio,
+      fecha,
+      items,
+      imageBase64,
+      notas: notasGlobal,
+      // flag para saltarse la verificación de duplicados
+      // (se setea desde el frontend cuando el usuario confirma "continuar igual")
+      confirmDuplicates,
+    } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "items requerido (array no vacío)" });
     }
@@ -222,6 +232,73 @@ router.post("/tickets/save", requireTicketsAuth, async (req, res) => {
       itemsByDestino[d].push(it);
     }
     const destinosCount = Object.keys(itemsByDestino).length;
+
+    // ═══════════════════════════════════════════════════
+    // DETECCIÓN DE POSIBLES DUPLICADOS
+    // Antes de crear, revisar si ya hay traslados parecidos:
+    //   - Mismo destino
+    //   - Fecha ±2 días
+    //   - Monto total ±10%
+    // Si encuentra y NO viene confirmDuplicates=true, devolver 409.
+    // ═══════════════════════════════════════════════════
+    if (!confirmDuplicates) {
+      const baseFecha = new Date(fechaSave);
+      const dayMs = 24 * 60 * 60 * 1000;
+      // Rango: 2 días antes y 2 días después
+      const fechaIni = new Date(baseFecha.getTime() - 2 * dayMs).toISOString().slice(0, 10);
+      const fechaFin = new Date(baseFecha.getTime() + 2 * dayMs).toISOString().slice(0, 10);
+
+      const matchesByDestino = [];
+
+      for (const [destino, itemsList] of Object.entries(itemsByDestino)) {
+        const valorTotalNuevo = itemsList.reduce(
+          (acc, it) => acc + (Number(it.precio_unit) || 0) * (Number(it.cantidad) || 0),
+          0
+        );
+        if (valorTotalNuevo === 0) continue;
+
+        let candidatos;
+        try {
+          candidatos = await listTrasladosPorDestinoYFecha(destino, fechaIni, fechaFin);
+        } catch (e) {
+          console.warn(`No se pudo buscar duplicados para ${destino}:`, e.message);
+          candidatos = [];
+        }
+
+        // Filtrar por monto similar (±10%)
+        const tolerance = 0.10;
+        const minVal = valorTotalNuevo * (1 - tolerance);
+        const maxVal = valorTotalNuevo * (1 + tolerance);
+        const matches = candidatos.filter(c => {
+          const v = Number(c.fields?.Valor_total) || 0;
+          return v >= minVal && v <= maxVal;
+        });
+
+        if (matches.length > 0) {
+          matchesByDestino.push({
+            destino,
+            valor_total_nuevo: Math.round(valorTotalNuevo * 100) / 100,
+            candidates: matches.map(c => ({
+              id: c.id,
+              folio: c.fields?.Folio || "(sin folio)",
+              fecha: c.fields?.Fecha || "?",
+              valor_total: c.fields?.Valor_total || 0,
+              quien_envia: c.fields?.Quien_envia || "?",
+              estado: c.fields?.Estado || "?",
+            })),
+          });
+        }
+      }
+
+      if (matchesByDestino.length > 0) {
+        return res.status(409).json({
+          ok: false,
+          code: "POSSIBLE_DUPLICATES",
+          message: "Hay traslados existentes que podrían ser el mismo ticket",
+          duplicates: matchesByDestino,
+        });
+      }
+    }
 
     const creados = [];
     let folioIndex = 0;
