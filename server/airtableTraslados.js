@@ -37,7 +37,10 @@ const NEGOCIOS_OPERATIVOS = [
 const DESTINOS_CONSUMO_PERSONAL = ["Casa"];
 const TODOS_DESTINOS = [...NEGOCIOS_OPERATIVOS, ...DESTINOS_CONSUMO_PERSONAL];
 
-const URL_T = (path) => `https://api.airtable.com/v0/${BASE}/${encodeURIComponent(path)}`;
+// NOTA: no aplicar encodeURIComponent sobre TODO el path porque eso encodea
+// los '?' y '=' de la querystring, rompiéndola. Las partes que vienen del
+// caller ya deben venir URL-safe (usar URLSearchParams para querystrings).
+const URL_T = (path) => `https://api.airtable.com/v0/${BASE}/${path}`;
 
 async function callT(method, path, body) {
   if (!BASE || !PAT) {
