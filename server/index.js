@@ -14,9 +14,11 @@ const { login } = require("./auth");
 const app = express();
 app.set("trust proxy", true); // para que req.ip funcione bien detrás de Render
 app.use(cors());
-// 1mb default para la mayoría de endpoints (reservas, login, etc).
-// El endpoint /api/tickets/* recibe imágenes base64 (~3-7MB) y monta su
-// propio middleware con limit mayor abajo.
+// IMPORTANTE: el body parser de tickets debe ir ANTES del global
+// porque Express ejecuta los middlewares en orden, y si el global de 1mb
+// se ejecuta primero, rechaza imágenes con 413 antes de llegar al router de tickets.
+app.use("/api/tickets", express.json({ limit: "30mb" }));
+// Body parser global para el resto (reservas, login, etc.) — 1mb es suficiente
 app.use(express.json({ limit: "1mb" }));
 
 // ===== Auth =====
@@ -36,9 +38,8 @@ app.use("/api", require("./routes/lili"));
 app.use("/api", require("./routes/maestro"));
 app.use("/api", require("./routes/gerencia"));
 
-// Tickets recibe imágenes base64 grandes (iPhone HEIC convertido a JPEG puede
-// llegar a 8-12MB sin comprimir). Damos margen amplio con 30mb.
-app.use("/api/tickets", express.json({ limit: "30mb" }));
+// El body parser de /api/tickets ya está configurado arriba con 30mb.
+// Acá solo montamos el router de las rutas.
 app.use("/api", require("./routes/tickets"));
 
 // ===== Health =====
