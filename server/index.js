@@ -36,10 +36,9 @@ app.use("/api", require("./routes/lili"));
 app.use("/api", require("./routes/maestro"));
 app.use("/api", require("./routes/gerencia"));
 
-// Tickets recibe imágenes base64 grandes — body parser dedicado con limit 15mb.
-// Express aplica el middleware MÁS específico primero, así que el JSON 1mb
-// general no aplica para /api/tickets/*.
-app.use("/api/tickets", express.json({ limit: "15mb" }));
+// Tickets recibe imágenes base64 grandes (iPhone HEIC convertido a JPEG puede
+// llegar a 8-12MB sin comprimir). Damos margen amplio con 30mb.
+app.use("/api/tickets", express.json({ limit: "30mb" }));
 app.use("/api", require("./routes/tickets"));
 
 // ===== Health =====
