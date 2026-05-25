@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono } = require("../airtable");
+const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR } = require("../airtable");
 
 const router = express.Router();
 
@@ -379,14 +379,16 @@ router.post("/reservas/cotorreo", async (req, res) => {
         "Telefono cliente": normalizeTelefono(telefono),
         "Email cliente": email,
         "Cumpleaños cliente": cumpleanos,
-        "Fecha y hora": new Date(fechaHora).toISOString(),
+        // BUG FIX timezone: parseFechaHoraCR interpreta el input "YYYY-MM-DDTHH:MM" como hora CR (UTC-6).
+        // Antes `new Date(fechaHora)` lo interpretaba como UTC en Render → -6h al renderizar (7pm aparecía como 1pm).
+        "Fecha y hora": parseFechaHoraCR(fechaHora).toISOString(),
         Personas: Number(personas),
         Ocasion: ocasion || "Ninguna",
         Area: area || undefined,
         Estado: "Confirmada",
         Cliente: [cliente.id],
         Notas: notas || undefined,
-        Referencia: `Cotorreo · ${nombre} · ${new Date(fechaHora).toISOString()}`,
+        Referencia: `Cotorreo · ${nombre} · ${parseFechaHoraCR(fechaHora).toISOString()}`,
       },
       { typecast: true }
     );

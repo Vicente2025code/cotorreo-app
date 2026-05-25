@@ -154,6 +154,33 @@ async function upsertCliente({ nombre, telefono, email, cumpleanos, cumpleanosDi
   return created;
 }
 
+/**
+ * Convierte un string de fecha/hora a Date interpretándolo como hora local Costa Rica (UTC-6).
+ *
+ * El input `datetime-local` de HTML devuelve "YYYY-MM-DDTHH:MM" SIN timezone.
+ * Si lo pasas a `new Date(s)` en un servidor UTC (Render), se interpreta como UTC,
+ * lo que crea un offset de -6h al renderizar (ej. 19:00 CR queda como 13:00 CR).
+ *
+ * Este helper fuerza la interpretación como CR.
+ *
+ * Acepta:
+ *   - "2026-05-25T19:00"         → 2026-05-26T01:00:00Z (19:00 CR)
+ *   - "2026-05-25T19:00:30"      → 2026-05-26T01:00:30Z
+ *   - "2026-05-26T01:00:00Z"     → respeta TZ explícita
+ *   - "2026-05-25T19:00-06:00"   → respeta TZ explícita
+ *   - Date / null / undefined    → pasa tal cual
+ */
+function parseFechaHoraCR(s) {
+  if (!s) return null;
+  if (s instanceof Date) return s;
+  const str = String(s).trim();
+  // Si ya trae timezone explícito (Z o ±HH:MM), respétalo
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(str)) return new Date(str);
+  // Si trae segundos
+  const withSec = /T\d{2}:\d{2}:\d{2}/.test(str) ? str : `${str}:00`;
+  return new Date(`${withSec}-06:00`);
+}
+
 module.exports = {
   TABLES,
   call,
@@ -165,4 +192,5 @@ module.exports = {
   findClienteByTelefono,
   buildCumpleanos,
   normalizeTelefono,
+  parseFechaHoraCR,
 };

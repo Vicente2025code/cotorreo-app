@@ -17,7 +17,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono } = require("../airtable");
+const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR } = require("../airtable");
 const { requireAuth } = require("../auth");
 
 const router = express.Router();
@@ -313,14 +313,16 @@ router.post(
           "Telefono cliente": normalizeTelefono(telefono),
           "Email cliente": email,
           "Cumpleaños cliente": cumpleanos,
-          "Fecha y hora": new Date(fechaHora).toISOString(),
+          // BUG FIX timezone: parseFechaHoraCR interpreta el input "YYYY-MM-DDTHH:MM" como hora CR (UTC-6).
+          // Antes `new Date(fechaHora)` lo interpretaba como UTC en Render → -6h al renderizar (7pm aparecía como 1pm).
+          "Fecha y hora": parseFechaHoraCR(fechaHora).toISOString(),
           Personas: Number(personas),
           Ocasion: ocasion || "Ninguna",
           Area: area || undefined,
           Estado: "Confirmada",
           Cliente: [cliente.id],
           Notas: notas || undefined,
-          Referencia: `Cotorreo · ${nombre} · ${new Date(fechaHora).toISOString()}`,
+          Referencia: `Cotorreo · ${nombre} · ${parseFechaHoraCR(fechaHora).toISOString()}`,
         },
         { typecast: true }
       );
@@ -331,6 +333,45 @@ router.post(
     }
   }
 );
+
+// ===========================
+// POST /api/clientes/manual  — capturar cliente sin reserva
+// Útil para que el operativo registre contactos que pasaron por el negocio
+// pero no reservaron en ese momento (CRM básico).
+// Body: { nombre, telefono, email?, cumpleanosDia?, cumpleanosMes?, negocio? }
+// Si el teléfono ya existe, devuelve el cliente existente (no duplica).
+// ===========================
+router.post("/clientes/manual", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    const { nombre, telefono, email, cumpleanosDia, cumpleanosMes, negocio } = req.body || {};
+    if (!nombre || !telefono) {
+      return res.status(400).json({ error: "Falta nombre o teléfono" });
+    }
+    const phone = normalizeTelefono(telefono);
+    if (!phone) return res.status(400).json({ error: "Teléfono inválido" });
+
+    // Detectar si el teléfono ya existe para informar al frontend
+    const existente = await findClienteByTelefono(phone);
+    const cliente = await upsertCliente({
+      nombre, telefono, email,
+      cumpleanosDia, cumpleanosMes,
+      negocio,
+    });
+    res.json({
+      ok: true,
+      ya_existia: !!existente,
+      cliente: {
+        id: cliente.id,
+        nombre: cliente.fields["Nombre completo"],
+        telefono: cliente.fields.Telefono,
+        email: cliente.fields.Email,
+      },
+    });
+  } catch (e) {
+    console.error("POST /clientes/manual", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ===========================
 // GET /api/paquetes  (lista todos los activos)
