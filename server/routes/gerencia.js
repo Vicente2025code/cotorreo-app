@@ -38,8 +38,12 @@ async function sumarPrecio(tableId, campoFecha, inicio, fin) {
     OR({Estado}='Confirmada', {Estado}='Completada')
   )`.replace(/\s+/g, " ");
   const r = await list(tableId, { filterByFormula: formula });
+  // BUG FIX: el campo "Precio" es una fórmula en Airtable. Cuando la fórmula falla
+  // (ej. reserva sin Cancha o sin Tipo), Airtable devuelve un objeto {specialValue:"NaN"}
+  // en lugar de un número. JavaScript hacía `0 + {object}` que convierte todo a string
+  // y concatena los demás valores. Fix: forzar Number() para que NaN se vuelva 0.
   const total = r.records.reduce(
-    (s, x) => s + (x.fields["Precio"] || 0),
+    (s, x) => s + (Number(x.fields["Precio"]) || 0),
     0
   );
   return { total, count: r.records.length, records: r.records };
