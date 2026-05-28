@@ -651,26 +651,30 @@ function mismoDia(a, b) {
 }
 
 function inicioSemana(d) {
-  // Lunes como inicio
+  // Lunes como inicio. Trabajamos con la FECHA CR (no la hora UTC) para evitar offset.
   const cr = new Date(d.getTime() - 6 * 3600 * 1000);
   const dia = cr.getUTCDay() || 7; // domingo=0->7
   const diff = dia - 1;
-  const lunes = new Date(d);
-  lunes.setUTCHours(0, 0, 0, 0);
-  lunes.setUTCDate(lunes.getUTCDate() - diff);
-  return lunes;
+  // Devolver un Date que cuando pase por isoCR dé la fecha del lunes CR.
+  // El día CR comienza a las 06:00 UTC; usamos 12:00 UTC como representación segura del día.
+  return new Date(Date.UTC(
+    cr.getUTCFullYear(),
+    cr.getUTCMonth(),
+    cr.getUTCDate() - diff,
+    12, 0, 0
+  ));
 }
 
 function inicioMes(d) {
   const cr = new Date(d.getTime() - 6 * 3600 * 1000);
-  const start = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), 1));
-  return start;
+  // Mismo principio: representar día CR como 12:00 UTC para que isoCR sea estable.
+  return new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), 1, 12, 0, 0));
 }
 
 function finMes(d) {
   const cr = new Date(d.getTime() - 6 * 3600 * 1000);
-  const fin = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth() + 1, 0));
-  return fin;
+  // Día 0 del mes siguiente = último día del mes actual.
+  return new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth() + 1, 0, 12, 0, 0));
 }
 
 function sumarDias(d, n) {
