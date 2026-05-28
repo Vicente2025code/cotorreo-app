@@ -254,6 +254,13 @@
   }
 
   .reserva-block.alpadel { background: var(--color-primary); }
+  .reserva-block.alpadel.cancha-singles {
+    background: #1a3a6b;
+    border-left: 3px solid #0f2546;
+  }
+  .reserva-block.alpadel.cancha-dobles {
+    border-left: 3px solid #007a5a;
+  }
   .reserva-block.cotorreo { background: var(--brand-magenta); }
   .reserva-block:hover { opacity: 0.85; }
   .reserva-block.estado-noshow { background: var(--brand-yellow); color: var(--text-primary); }
@@ -856,7 +863,10 @@ function pintarBloqueSemana(r, colIdx, lun) {
   const block = document.createElement("div");
   const estadoCls = (r.estado || "").toLowerCase() === "no-show" ? "estado-noshow"
                  : (r.estado || "").toLowerCase() === "completada" ? "estado-completada" : "";
-  block.className = `reserva-block ${r.tipo} ${estadoCls}`;
+  const canchaCls = r.tipo === "alpadel" && r.cancha === "Singles" ? "cancha-singles"
+                  : r.tipo === "alpadel" && r.cancha === "Dobles"  ? "cancha-dobles"
+                  : "";
+  block.className = `reserva-block ${r.tipo} ${canchaCls} ${estadoCls}`;
   block.style.top = (m / 60) * 48 + "px";
   block.style.height = heightPx + "px";
   block.innerHTML = `
@@ -929,12 +939,15 @@ function pintarBloqueDia(r, tipo) {
   const block = document.createElement("div");
   const estadoCls = (r.estado || "").toLowerCase() === "no-show" ? "estado-noshow"
                  : (r.estado || "").toLowerCase() === "completada" ? "estado-completada" : "";
-  block.className = `reserva-block ${tipo} ${estadoCls}`;
+  const canchaCls = tipo === "alpadel" && r.cancha === "Singles" ? "cancha-singles"
+                  : tipo === "alpadel" && r.cancha === "Dobles"  ? "cancha-dobles"
+                  : "";
+  block.className = `reserva-block ${tipo} ${canchaCls} ${estadoCls}`;
   block.style.top = ((m % 30) / 30) * slotHeight + "px";
   block.style.height = (dur * 2 * slotHeight) - 4 + "px";
   block.innerHTML = `
     <div class="reserva-block-name">${r.nombre || "—"}</div>
-    <div class="reserva-block-meta">${tipo === "alpadel" ? `${dur}h` : ((r.personas||"?") + " pax")}</div>
+    <div class="reserva-block-meta">${tipo === "alpadel" ? `${dur}h ${r.cancha || ""}` : ((r.personas||"?") + " pax")}</div>
   `;
   block.onclick = (e) => { e.stopPropagation(); abrirDetalle({...r, tipo}); };
   cell.appendChild(block);
@@ -1043,6 +1056,25 @@ function crearEnSlot(fechaIso, hora, min, tipo, cancha) {
 }
 
 function cambiarTipoCrear(tipo) {
+  // Preservar lo que el usuario ya editó antes del re-render
+  // (evita que cambiar de tab pise la hora/fecha que el usuario corrigió)
+  const elHora      = document.getElementById("crear-hora");
+  const elFecha     = document.getElementById("crear-fecha");
+  const elFechaHora = document.getElementById("crear-fechahora");
+  if (elHora && /^\d{1,2}:\d{2}/.test(elHora.value)) {
+    const [hh, mm] = elHora.value.split(":").map(Number);
+    crearHoraPreRellena = hh * 60 + (mm || 0);
+  }
+  if (elFecha && /^\d{4}-\d{2}-\d{2}/.test(elFecha.value)) {
+    crearFechaPreRellena = elFecha.value;
+  }
+  if (elFechaHora && /^\d{4}-\d{2}-\d{2}T\d{1,2}:\d{2}/.test(elFechaHora.value)) {
+    const [f, h] = elFechaHora.value.split("T");
+    crearFechaPreRellena = f;
+    const [hh, mm] = h.split(":").map(Number);
+    crearHoraPreRellena = hh * 60 + (mm || 0);
+  }
+
   crearTipo = tipo;
   clienteSelCrear = null;
   document.querySelectorAll(".modal-tab").forEach(t => {
