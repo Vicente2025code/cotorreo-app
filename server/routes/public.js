@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR } = require("../airtable");
+const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
 
 const router = express.Router();
 
@@ -281,6 +281,23 @@ router.post("/reservas/alpadel", async (req, res) => {
 
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+    // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear
+    const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
+    if (conflicto) {
+      const fmtCR = (iso) => {
+        const d = new Date(iso);
+        return new Intl.DateTimeFormat("es-CR", {
+          timeZone: "America/Costa_Rica",
+          weekday: "short", day: "numeric", month: "short",
+          hour: "2-digit", minute: "2-digit", hour12: false,
+        }).format(d);
+      };
+      return res.status(409).json({
+        error: `Esa cancha ya está reservada de ${fmtCR(conflicto.inicio)} a ${fmtCR(conflicto.fin)}. Elegí otro horario o la otra cancha.`,
+        conflicto,
+      });
+    }
 
     const cliente = existing || await upsertCliente({
       nombre,

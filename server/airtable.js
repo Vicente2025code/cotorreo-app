@@ -181,6 +181,37 @@ function parseFechaHoraCR(s) {
   return new Date(`${withSec}-06:00`);
 }
 
+/**
+ * Busca reservas Alpadel que se solapen con [startISO, endISO] en la misma cancha.
+ * Lógica: existeInicio < propuestoFin AND existeFin > propuestoInicio.
+ * Solo considera reservas activas (Confirmada / Pendiente).
+ * excludeId: omite una reserva (para updates).
+ * Devuelve la primera reserva en conflicto, o null si no hay.
+ */
+async function findAlpadelOverlap(cancha, startISO, endISO, { excludeId } = {}) {
+  if (!cancha || !startISO || !endISO) return null;
+  const formula = `AND(
+    {Cancha}='${cancha}',
+    OR({Estado}='Confirmada', {Estado}='Pendiente'),
+    IS_BEFORE({Fecha y hora inicio}, '${endISO}'),
+    IS_AFTER({Hora fin}, '${startISO}')
+  )`.replace(/\s+/g, " ");
+  const r = await list(TABLES.ReservasAlpadel, { filterByFormula: formula, pageSize: 5 });
+  const conflictos = (r.records || []).filter(rec => !excludeId || rec.id !== excludeId);
+  if (conflictos.length === 0) return null;
+  const c = conflictos[0];
+  return {
+    id: c.id,
+    nombre: c.fields["Nombre cliente"] || "(sin nombre)",
+    inicio: c.fields["Fecha y hora inicio"],
+    fin: c.fields["Hora fin"],
+    cancha: c.fields["Cancha"],
+    estado: c.fields["Estado"],
+    tipo: c.fields["Tipo de reserva"],
+    totalConflictos: conflictos.length,
+  };
+}
+
 module.exports = {
   TABLES,
   call,
@@ -193,4 +224,5 @@ module.exports = {
   buildCumpleanos,
   normalizeTelefono,
   parseFechaHoraCR,
+  findAlpadelOverlap,
 };

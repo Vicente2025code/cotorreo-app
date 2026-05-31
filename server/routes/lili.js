@@ -17,7 +17,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR } = require("../airtable");
+const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
 
 const router = express.Router();
@@ -203,6 +203,23 @@ router.post(
 
       const startCR = new Date(`${fecha}T${hora}:00-06:00`);
       const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+      // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear.
+      // El operativo puede forzar con `force: true` si sabe lo que hace (ej. dobles paralelos en torneo).
+      if (!req.body.force) {
+        const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
+        if (conflicto) {
+          const fmtCR = (iso) => new Intl.DateTimeFormat("es-CR", {
+            timeZone: "America/Costa_Rica",
+            weekday: "short", day: "numeric", month: "short",
+            hour: "2-digit", minute: "2-digit", hour12: false,
+          }).format(new Date(iso));
+          return res.status(409).json({
+            error: `${cancha} ya está reservada de ${fmtCR(conflicto.inicio)} a ${fmtCR(conflicto.fin)} para ${conflicto.nombre} (${conflicto.tipo || "Regular"}). Cambia el horario o envía force=true para sobreescribir.`,
+            conflicto,
+          });
+        }
+      }
 
       const fields = {
         "Fecha y hora inicio": startCR.toISOString(),
