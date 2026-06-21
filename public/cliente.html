@@ -1582,17 +1582,19 @@ poblarCumple("al");
 poblarCumple("co");
 
 // Horas de Alpadel: 07:00 a 22:00 cada 30 min
+// Label en 12h AM/PM para evitar confusion cliente (Oscar/Kerth). value sigue en 24h.
+function _to12h(h, m) { const p=h>=12?"PM":"AM"; const h12=h===0?12:(h>12?h-12:h); return `${h12}:${m} ${p}`; }
 const horaSel = document.getElementById("alHora");
 for (let h = 7; h < 22; h++) {
   for (const m of ["00", "30"]) {
     const o = document.createElement("option");
     o.value = `${String(h).padStart(2,"0")}:${m}`;
-    o.textContent = `${String(h).padStart(2,"0")}:${m}`;
+    o.textContent = _to12h(h, m);
     horaSel.appendChild(o);
   }
 }
 const last = document.createElement("option");
-last.value = "22:00"; last.textContent = "22:00";
+last.value = "22:00"; last.textContent = _to12h(22, "00");
 horaSel.appendChild(last);
 
 // Deep-link desde el bot: ?tipo=alpadel&tel=50688887777
