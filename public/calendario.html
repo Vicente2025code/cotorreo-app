@@ -841,11 +841,51 @@ function renderSemana() {
       const d = sumarDias(lun, i);
       const dIso = isoCR(d);
       const { al, co } = reservasDelDia(dIso);
-      [...al.map(r => ({...r, tipo: 'alpadel'})), ...co.map(r => ({...r, tipo: 'cotorreo'}))].forEach(r => {
-        pintarBloqueSemana(r, i, lun);
-      });
+      const bloques = [
+        ...al.map(r => ({...r, tipo: 'alpadel'})),
+        ...co.map(r => ({...r, tipo: 'cotorreo'})),
+      ];
+      // Asignar columnas para evitar solapamiento visual cuando hay overlap temporal
+      asignarColumnasOverlap(bloques);
+      bloques.forEach(r => pintarBloqueSemana(r, i, lun));
     }
   }, 0);
+}
+
+// Algoritmo greedy de scheduling: para cada bloque le asigna una "columna virtual" dentro
+// del día. Si dos bloques tienen overlap temporal, van en columnas distintas (uno a la izq,
+// otro a la der). totalCols = cuántas columnas se necesitan en el peor momento del día.
+// Cada bloque recibe r._col y r._totalCols para que pintarBloqueSemana calcule left/width.
+function asignarColumnasOverlap(bloques) {
+  // Calcular minutos start/end de cada bloque
+  bloques.forEach(b => {
+    const ini = new Date(b.fechaHora);
+    const cr = new Date(ini.getTime() - 6 * 3600 * 1000);
+    b._startMin = cr.getUTCHours() * 60 + cr.getUTCMinutes();
+    const durHoras = b.tipo === 'alpadel' ? (b.duracion || 1) : 1.5;
+    b._endMin = b._startMin + durHoras * 60;
+  });
+  // Ordenar por start
+  bloques.sort((a, b) => a._startMin - b._startMin);
+  // Slots libres: cada uno guarda el endMin del último bloque que asignó
+  const slots = [];
+  for (const b of bloques) {
+    let asignado = -1;
+    for (let i = 0; i < slots.length; i++) {
+      if (slots[i] <= b._startMin) {
+        slots[i] = b._endMin;
+        asignado = i;
+        break;
+      }
+    }
+    if (asignado === -1) {
+      slots.push(b._endMin);
+      asignado = slots.length - 1;
+    }
+    b._col = asignado;
+  }
+  const totalCols = Math.max(1, slots.length);
+  bloques.forEach(b => { b._totalCols = totalCols; });
 }
 
 function pintarBloqueSemana(r, colIdx, lun) {
@@ -869,6 +909,16 @@ function pintarBloqueSemana(r, colIdx, lun) {
   block.className = `reserva-block ${r.tipo} ${canchaCls} ${estadoCls}`;
   block.style.top = (m / 60) * 48 + "px";
   block.style.height = heightPx + "px";
+  // Si hay solapamiento temporal con otra reserva del mismo día, dividir ancho horizontal
+  // para que ambos bloques sean visibles uno al lado del otro.
+  const totalCols = r._totalCols || 1;
+  const col = r._col || 0;
+  if (totalCols > 1) {
+    const pct = 100 / totalCols;
+    block.style.left = `calc(${col * pct}% + 1px)`;
+    block.style.right = "auto";
+    block.style.width = `calc(${pct}% - 2px)`;
+  }
   block.innerHTML = `
     <div class="reserva-block-name">${r.nombre || "—"}</div>
     <div class="reserva-block-meta">${r.tipo === "alpadel" ? (r.cancha || "") : ((r.personas||"?") + " pax")}</div>
