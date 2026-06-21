@@ -74,12 +74,13 @@ document.querySelectorAll(".tab").forEach(btn => {
   });
 });
 
-// Llenar horas
+// Llenar horas — value en 24h (backend), label en 12h AM/PM
+function _to12h(h, m) { const p=h>=12?"PM":"AM"; const h12=h===0?12:(h>12?h-12:h); return `${h12}:${m} ${p}`; }
 const horaSel = document.getElementById("n-hora");
 horaSel.innerHTML = '<option value="">Selecciona...</option>';
 for (let i = 7; i <= 22; i++) {
-  horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:00</option>`;
-  if (i < 22) horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:30</option>`;
+  horaSel.innerHTML += `<option value="${String(i).padStart(2,"0")}:00">${_to12h(i,"00")}</option>`;
+  if (i < 22) horaSel.innerHTML += `<option value="${String(i).padStart(2,"0")}:30">${_to12h(i,"30")}</option>`;
 }
 document.getElementById("n-fecha").value = todayISO();
 

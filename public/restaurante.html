@@ -145,11 +145,13 @@ if (!requireRole(["saloneros", "lili", "gerencia"])) throw new Error("Sin permis
 document.getElementById("todayText").textContent = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
 
 document.getElementById("c-fecha").value = todayISO();
+// value en 24h (backend no cambia), label en 12h con AM/PM para que el operativo no se confunda
+function _to12h(h, m) { const p=h>=12?"PM":"AM"; const h12=h===0?12:(h>12?h-12:h); return `${h12}:${m} ${p}`; }
 const horaSel = document.getElementById("c-hora");
 horaSel.innerHTML = '<option value="">Selecciona...</option>';
 for (let i = 7; i <= 22; i++) {
-  horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:00</option>`;
-  if (i < 22) horaSel.innerHTML += `<option>${String(i).padStart(2,"0")}:30</option>`;
+  horaSel.innerHTML += `<option value="${String(i).padStart(2,"0")}:00">${_to12h(i,"00")}</option>`;
+  if (i < 22) horaSel.innerHTML += `<option value="${String(i).padStart(2,"0")}:30">${_to12h(i,"30")}</option>`;
 }
 
 const cargados = { paquetes: false, recurrentes: false, cumples: false };

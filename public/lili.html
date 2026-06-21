@@ -369,10 +369,12 @@ function renderManualForm() {
 document.getElementById("manualTipo").addEventListener("change", renderManualForm);
 
 function horasOpts() {
+  // value en 24h (backend no cambia), label en 12h con AM/PM
+  const to12 = (h, m) => { const p=h>=12?"PM":"AM"; const h12=h===0?12:(h>12?h-12:h); return `${h12}:${m} ${p}`; };
   let h = '<option value="">Selecciona...</option>';
   for (let i = 7; i <= 22; i++) {
-    h += `<option value="${String(i).padStart(2,"0")}:00">${String(i).padStart(2,"0")}:00</option>`;
-    if (i < 22) h += `<option value="${String(i).padStart(2,"0")}:30">${String(i).padStart(2,"0")}:30</option>`;
+    h += `<option value="${String(i).padStart(2,"0")}:00">${to12(i,"00")}</option>`;
+    if (i < 22) h += `<option value="${String(i).padStart(2,"0")}:30">${to12(i,"30")}</option>`;
   }
   return h;
 }
