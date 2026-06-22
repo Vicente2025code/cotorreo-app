@@ -129,6 +129,10 @@ router.get("/reservas/calendario", requireAuth([...OPERATIVO, "maestro"]), async
     const ini = startOfDayCR(desde);
     const fin = endOfDayCR(hasta);
 
+    // Maestros solo ven reservas de canchas (Alpadel), no de mesas (Cotorreo).
+    // Para ellos saltamos la query a Cotorreo y devolvemos cotorreo vacío.
+    const esMaestro = req.user && req.user.rol === "maestro";
+
     const formAl = `AND(IS_AFTER({Fecha y hora inicio}, '${ini}'), IS_BEFORE({Fecha y hora inicio}, '${fin}'), {Estado} != 'Cancelada')`;
     const formCo = `AND(IS_AFTER({Fecha y hora}, '${ini}'), IS_BEFORE({Fecha y hora}, '${fin}'), {Estado} != 'Cancelada')`;
 
@@ -137,10 +141,12 @@ router.get("/reservas/calendario", requireAuth([...OPERATIVO, "maestro"]), async
         filterByFormula: formAl,
         sort: [{ field: "Fecha y hora inicio", direction: "asc" }],
       }),
-      list(TABLES.ReservasCotorreo, {
-        filterByFormula: formCo,
-        sort: [{ field: "Fecha y hora", direction: "asc" }],
-      }),
+      esMaestro
+        ? Promise.resolve({ records: [] })
+        : list(TABLES.ReservasCotorreo, {
+            filterByFormula: formCo,
+            sort: [{ field: "Fecha y hora", direction: "asc" }],
+          }),
     ]);
 
     res.json({

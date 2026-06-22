@@ -628,11 +628,19 @@ if (!requireRole(["lili", "gerencia", "saloneros", "maestro"])) throw new Error(
 const user = getUser();
 document.getElementById("headerUser").textContent = user.nombre + " · " + user.rol;
 
+// Maestros solo ven canchas Alpadel, no mesas Cotorreo: ocultar el chip de Mesas
+const SOLO_ALPADEL = user.rol === "maestro";
+if (SOLO_ALPADEL) {
+  const chipMesas = document.getElementById("chipCotorreo");
+  if (chipMesas) chipMesas.style.display = "none";
+}
+
 // ============ ESTADO ============
 const state = {
   vista: "semana",          // 'dia' | 'semana' | 'mes'
   fecha: new Date(),        // fecha ancla
-  filtros: { alpadel: true, cotorreo: true },
+  // Cotorreo siempre false para maestros (aunque el server tampoco devuelve cotorreo para ellos)
+  filtros: { alpadel: true, cotorreo: !SOLO_ALPADEL },
   reservas: { alpadel: [], cotorreo: [] },
 };
 
