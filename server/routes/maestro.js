@@ -31,26 +31,29 @@ router.get("/mis-reservas", requireAuth(["maestro"]), async (req, res) => {
   try {
     const id = req.user.recordId;
     const ahora = new Date().toISOString();
-    const formula = `AND(
-      FIND('${id}', ARRAYJOIN({Maestro})) > 0,
-      OR({Estado}='Confirmada', {Estado}='Completada')
-    )`.replace(/\s+/g, " ");
+    // NOTA: filtramos por Tipo=Maestro en Airtable y por recordId del Maestro en JS.
+    // No usamos FIND/SEARCH sobre ARRAYJOIN({Maestro}) porque las fórmulas Airtable
+    // sobre linked records devuelven el PRIMARY FIELD (el nombre), no el recordId.
+    // Sin embargo en la respuesta JSON el campo Maestro SÍ viene como array de IDs.
+    const formula = `AND( {Tipo de reserva}='Maestro', OR({Estado}='Confirmada', {Estado}='Completada') )`;
 
     const r = await list(TABLES.ReservasAlpadel, {
       filterByFormula: formula,
       sort: [{ field: "Fecha y hora inicio", direction: "asc" }],
     });
 
-    const todas = r.records.map((rec) => ({
-      id: rec.id,
-      fechaHora: rec.fields["Fecha y hora inicio"],
-      horaFin: rec.fields["Hora fin"],
-      cancha: rec.fields["Cancha"],
-      estado: rec.fields["Estado"],
-      notas: rec.fields["Notas"],
-      duracion: rec.fields["Duracion horas"],
-      precio: rec.fields["Precio"],
-    }));
+    const todas = r.records
+      .filter((rec) => Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id))
+      .map((rec) => ({
+        id: rec.id,
+        fechaHora: rec.fields["Fecha y hora inicio"],
+        horaFin: rec.fields["Hora fin"],
+        cancha: rec.fields["Cancha"],
+        estado: rec.fields["Estado"],
+        notas: rec.fields["Notas"],
+        duracion: rec.fields["Duracion horas"],
+        precio: rec.fields["Precio"],
+      }));
 
     const futuras = todas.filter((x) => x.fechaHora >= ahora);
     const pasadas = todas.filter((x) => x.fechaHora < ahora);
@@ -147,8 +150,10 @@ router.get("/mi-facturacion", requireAuth(["maestro"]), async (req, res) => {
     const lastDay = new Date(year, month, 0).getDate();
     const fin = `${mes}-${String(lastDay).padStart(2, "0")}T23:59:59-06:00`;
 
+    // Mismo motivo que /mis-reservas: filtramos en Airtable por Tipo/Estado/Fechas
+    // y filtramos por Maestro=recordId en JS porque ARRAYJOIN({Maestro}) devuelve
+    // el primary field (nombre), no el recordId.
     const formula = `AND(
-      FIND('${id}', ARRAYJOIN({Maestro})) > 0,
       {Tipo de reserva}='Maestro',
       OR({Estado}='Confirmada', {Estado}='Completada'),
       IS_AFTER({Fecha y hora inicio}, '${inicio}'),
@@ -156,13 +161,15 @@ router.get("/mi-facturacion", requireAuth(["maestro"]), async (req, res) => {
     )`.replace(/\s+/g, " ");
 
     const r = await list(TABLES.ReservasAlpadel, { filterByFormula: formula });
-    const reservas = r.records.map((x) => ({
-      id: x.id,
-      fechaHora: x.fields["Fecha y hora inicio"],
-      cancha: x.fields["Cancha"],
-      duracion: x.fields["Duracion horas"],
-      precio: x.fields["Precio"],
-    }));
+    const reservas = r.records
+      .filter((x) => Array.isArray(x.fields.Maestro) && x.fields.Maestro.includes(id))
+      .map((x) => ({
+        id: x.id,
+        fechaHora: x.fields["Fecha y hora inicio"],
+        cancha: x.fields["Cancha"],
+        duracion: x.fields["Duracion horas"],
+        precio: x.fields["Precio"],
+      }));
     const totalHoras = reservas.reduce((s, x) => s + (x.duracion || 0), 0);
     const totalAPagar = reservas.reduce((s, x) => s + (x.precio || 0), 0);
 
