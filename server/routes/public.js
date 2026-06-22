@@ -282,6 +282,19 @@ router.post("/reservas/alpadel", async (req, res) => {
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
 
+    // BLOQUEO ANTI-PASADO — no permitir reservas para horas que ya pasaron
+    // (caso Oscar: seleccionó 8 AM cuando ya eran las 4 PM del mismo día)
+    if (startCR.getTime() <= Date.now()) {
+      const fmtCR = new Intl.DateTimeFormat("es-CR", {
+        timeZone: "America/Costa_Rica",
+        weekday: "short", day: "numeric", month: "short",
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      }).format(startCR);
+      return res.status(400).json({
+        error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.`,
+      });
+    }
+
     // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear
     const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
     if (conflicto) {
@@ -378,6 +391,19 @@ router.post("/reservas/cotorreo", async (req, res) => {
 
     if (faltan.length)
       return res.status(400).json({ error: `Faltan: ${faltan.join(", ")}` });
+
+    // BLOQUEO ANTI-PASADO — no permitir reservas de mesa para horas que ya pasaron
+    const startMesa = parseFechaHoraCR(fechaHora);
+    if (startMesa && startMesa.getTime() <= Date.now()) {
+      const fmtCR = new Intl.DateTimeFormat("es-CR", {
+        timeZone: "America/Costa_Rica",
+        weekday: "short", day: "numeric", month: "short",
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      }).format(startMesa);
+      return res.status(400).json({
+        error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.`,
+      });
+    }
 
     const cliente = existing || await upsertCliente({
       nombre,

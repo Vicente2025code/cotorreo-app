@@ -204,6 +204,19 @@ router.post(
       const startCR = new Date(`${fecha}T${hora}:00-06:00`);
       const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
 
+      // BLOQUEO ANTI-PASADO — no permitir reservas para horas que ya pasaron.
+      // El operativo puede forzar con `force: true` si está registrando una reserva pasada legítima.
+      if (!req.body.force && startCR.getTime() <= Date.now()) {
+        const fmtCR = new Intl.DateTimeFormat("es-CR", {
+          timeZone: "America/Costa_Rica",
+          weekday: "short", day: "numeric", month: "short",
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        }).format(startCR);
+        return res.status(400).json({
+          error: `Esa hora (${fmtCR}) ya pasó. Usá force=true si querés registrarla igual.`,
+        });
+      }
+
       // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear.
       // El operativo puede forzar con `force: true` si sabe lo que hace (ej. dobles paralelos en torneo).
       if (!req.body.force) {
