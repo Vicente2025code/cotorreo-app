@@ -19,12 +19,19 @@
 const express = require("express");
 const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
+const mantenimiento = require("../airtableMantenimiento");
 
 const router = express.Router();
 
 // Roles que pueden operar: lili, gerencia, saloneros
 const OPERATIVO = ["lili", "gerencia", "saloneros"];
 const ADMIN = ["lili", "gerencia"];
+
+// Record IDs de usuarios en tabla Usuarios de la base Mantenimiento (para "Reportado por")
+const USER_REC_BY_ROL = {
+  lili: "recGLO0rlj3MeTeyQ",       // Lili (Supervisor)
+  gerencia: "recdLbQkejwhIPyqo",   // Vicente (Administrador)
+};
 
 // Helpers de fecha
 function todayCR() {
@@ -629,6 +636,120 @@ router.get("/cumpleanos/mes", requireAuth(OPERATIVO), async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ===========================
+// GET /api/tickets — tickets de mantenimiento pendientes
+// ===========================
+router.get("/tickets", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    if (!mantenimiento.isConfigured()) {
+      return res.status(500).json({ error: "Mantenimiento no configurado" });
+    }
+    const [records, usuariosMap] = await Promise.all([
+      mantenimiento.listTicketsActivos(),
+      mantenimiento.getUsuariosMap(),
+    ]);
+    const tickets = records.map((rec) => {
+      const f = rec.fields || {};
+      const ejecArr = f["Ejecutor asignado"] || [];
+      const reporArr = f["Reportado por"] || [];
+      return {
+        id: rec.id,
+        descripcion: f["Descripción del problema"] || "",
+        negocio: f["Negocio"] || "",
+        area: f["Área"] || "",
+        urgencia: f["Urgencia real"] || f["Urgencia reportada"] || "",
+        estado: f["Estado"] || "Nuevo",
+        ejecutor_id: ejecArr[0] || null,
+        ejecutor_nombre: ejecArr[0] ? usuariosMap[ejecArr[0]] || "—" : null,
+        reportado_por: reporArr[0] ? usuariosMap[reporArr[0]] || "—" : null,
+        fecha_compromiso: f["Fecha compromiso"] || null,
+        fotos: (f["Fotos del problema"] || []).map((p) => ({
+          url: p.url,
+          thumb: (p.thumbnails && p.thumbnails.large && p.thumbnails.large.url) || p.url,
+        })),
+      };
+    });
+    // Ordenar: sin asignar primero, después urgencia, después fecha compromiso
+    const urgOrden = { Critica: 0, "Crítica": 0, Alta: 1, Media: 2, Baja: 3 };
+    tickets.sort((a, b) => {
+      const aAsign = a.ejecutor_id ? 1 : 0;
+      const bAsign = b.ejecutor_id ? 1 : 0;
+      if (aAsign !== bAsign) return aAsign - bAsign;
+      const ua = urgOrden[a.urgencia] ?? 9;
+      const ub = urgOrden[b.urgencia] ?? 9;
+      if (ua !== ub) return ua - ub;
+      const fa = a.fecha_compromiso || "9999-12-31";
+      const fb = b.fecha_compromiso || "9999-12-31";
+      return fa.localeCompare(fb);
+    });
+    const sinAsignar = tickets.filter((t) => !t.ejecutor_id).length;
+    res.json({
+      total: tickets.length,
+      sin_asignar: sinAsignar,
+      tickets,
+    });
+  } catch (e) {
+    console.error("GET /tickets", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
+// POST /api/tickets — crear nuevo ticket (Lili reporta)
+// Body: { descripcion, negocio, area, urgencia_reportada, fotos: [url] }
+// ===========================
+router.post("/tickets", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    if (!mantenimiento.isConfigured()) {
+      return res.status(500).json({ error: "Mantenimiento no configurado" });
+    }
+    const { descripcion, negocio, area, urgencia_reportada, fotos } = req.body || {};
+    if (!descripcion || typeof descripcion !== "string" || descripcion.trim().length < 3) {
+      return res.status(400).json({ error: "Descripción requerida (mín 3 chars)" });
+    }
+    if (negocio && !mantenimiento.NEGOCIOS_VALIDOS.includes(negocio)) {
+      return res.status(400).json({ error: "Negocio no válido", validos: mantenimiento.NEGOCIOS_VALIDOS });
+    }
+    if (area && !mantenimiento.AREAS_VALIDAS.includes(area)) {
+      return res.status(400).json({ error: "Área no válida", validas: mantenimiento.AREAS_VALIDAS });
+    }
+    if (urgencia_reportada && !mantenimiento.URGENCIAS_VALIDAS.includes(urgencia_reportada)) {
+      return res.status(400).json({ error: "Urgencia no válida", validas: mantenimiento.URGENCIAS_VALIDAS });
+    }
+    // El usuario que reporta = el rol que está autenticado
+    const rol = req.user && req.user.rol;
+    const reportadoPorId = USER_REC_BY_ROL[rol] || USER_REC_BY_ROL.lili;
+    const created = await mantenimiento.createTicket({
+      descripcion: descripcion.trim(),
+      negocio,
+      area,
+      urgenciaReportada: urgencia_reportada,
+      reportadoPorId,
+      fotos: Array.isArray(fotos) ? fotos.filter(Boolean).slice(0, 5) : [],
+    });
+    res.json({
+      ok: true,
+      ticket_id: created.id,
+      estado: "Nuevo",
+      mensaje: "Ticket creado. Vicente lo revisará para asignar ejecutor.",
+    });
+  } catch (e) {
+    console.error("POST /tickets", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
+// GET /api/tickets/opciones — devuelve dropdowns válidos
+// ===========================
+router.get("/tickets/opciones", requireAuth(OPERATIVO), async (req, res) => {
+  res.json({
+    negocios: mantenimiento.NEGOCIOS_VALIDOS,
+    areas: mantenimiento.AREAS_VALIDAS,
+    urgencias: mantenimiento.URGENCIAS_VALIDAS,
+  });
 });
 
 module.exports = router;

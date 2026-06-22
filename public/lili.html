@@ -28,6 +28,7 @@
     <button class="tab" data-tab="recurrentes">Recurrentes</button>
     <button class="tab" data-tab="cumples">Cumples</button>
     <button class="tab" data-tab="maestros">Maestros</button>
+    <button class="tab" data-tab="mantenimiento">🔧 Mantenimiento</button>
   </div>
 
   <!-- TAB: HOY -->
@@ -118,6 +119,23 @@
       <div id="maestros-list" class="loading">Cargando</div>
     </div>
   </div>
+
+  <!-- TAB: MANTENIMIENTO -->
+  <div class="tab-content" id="tab-mantenimiento">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+        <h3 style="margin:0;">🔧 Tickets pendientes</h3>
+        <button class="btn btn-primary btn-sm" onclick="abrirCrearTicket()">+ Nuevo ticket</button>
+      </div>
+      <div id="tickets-stats" style="font-size:13px;color:var(--text-secondary,#64748b);margin-bottom:10px;"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="tickets-filtros">
+        <button class="btn btn-sm filter-tk active" data-filt="todos">Todos</button>
+        <button class="btn btn-sm filter-tk" data-filt="sin-asignar">Sin asignar</button>
+        <button class="btn btn-sm filter-tk" data-filt="urgentes">Urgentes</button>
+      </div>
+      <div id="tickets-list" class="loading">Cargando</div>
+    </div>
+  </div>
 </div>
 
 <script src="/js/common.js"></script>
@@ -152,6 +170,167 @@ function loadTab(t) {
     case "recurrentes": loadRecurrentes(); break;
     case "cumples": loadCumples(); break;
     case "maestros": loadMaestros(); break;
+    case "mantenimiento": loadTickets(); break;
+  }
+}
+
+// ===== MANTENIMIENTO (tickets) =====
+let _ticketsAll = [];
+let _ticketsFiltro = "todos";
+
+async function loadTickets() {
+  try {
+    const data = await api("GET", "/api/tickets");
+    _ticketsAll = data.tickets || [];
+    document.getElementById("tickets-stats").textContent =
+      `${data.total} pendientes · ${data.sin_asignar} sin asignar`;
+    renderTickets();
+  } catch (e) {
+    document.getElementById("tickets-list").innerHTML =
+      `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+document.querySelectorAll(".filter-tk").forEach((b) => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".filter-tk").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    _ticketsFiltro = b.dataset.filt;
+    renderTickets();
+  });
+});
+
+function renderTickets() {
+  let list = _ticketsAll;
+  if (_ticketsFiltro === "sin-asignar") list = list.filter((t) => !t.ejecutor_id);
+  if (_ticketsFiltro === "urgentes") list = list.filter((t) => t.urgencia === "Alta" || t.urgencia === "Critica" || t.urgencia === "Crítica");
+
+  const el = document.getElementById("tickets-list");
+  if (!list.length) {
+    el.innerHTML = "<em>No hay tickets en este filtro.</em>";
+    return;
+  }
+  el.innerHTML = list.map((t) => {
+    const urgClass = (t.urgencia || "").toLowerCase().replace("crítica", "critica");
+    const ejecLabel = t.ejecutor_nombre ? `👷 ${escapeHtml(t.ejecutor_nombre.trim())}` : '<span style="color:#dc2626;font-weight:700;">⚠️ Sin asignar</span>';
+    return `
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:6px;">
+          <div style="font-weight:700;font-size:14px;line-height:1.3;flex:1;">${escapeHtml(t.descripcion || "(sin descripción)")}</div>
+          <span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;text-transform:uppercase;background:${urgBg(t.urgencia)};color:${urgFg(t.urgencia)};">${escapeHtml(t.urgencia || "—")}</span>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:6px;">
+          ${t.negocio ? `📍 ${escapeHtml(t.negocio)}` : ""}
+          ${t.area ? ` · ${escapeHtml(t.area)}` : ""}
+          ${t.fecha_compromiso ? ` · 📅 ${escapeHtml(t.fecha_compromiso)}` : ""}
+        </div>
+        <div style="font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>${ejecLabel}</span>
+          <span style="color:#94a3b8;">Estado: ${escapeHtml(t.estado)}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function urgBg(u) {
+  const x = (u || "").toLowerCase();
+  if (x.includes("crit")) return "#fee2e2";
+  if (x === "alta") return "#fed7aa";
+  if (x === "media") return "#fef3c7";
+  if (x === "baja") return "#e0f2fe";
+  return "#f1f5f9";
+}
+function urgFg(u) {
+  const x = (u || "").toLowerCase();
+  if (x.includes("crit")) return "#991b1b";
+  if (x === "alta") return "#9a3412";
+  if (x === "media") return "#92400e";
+  if (x === "baja") return "#075985";
+  return "#475569";
+}
+function escapeHtml(s) {
+  return String(s || "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+}
+
+let _ticketsOpts = null;
+async function abrirCrearTicket() {
+  if (!_ticketsOpts) {
+    try { _ticketsOpts = await api("GET", "/api/tickets/opciones"); }
+    catch (e) { alert("Error cargando opciones: " + e.message); return; }
+  }
+  const optsNeg = _ticketsOpts.negocios.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n.trim())}</option>`).join("");
+  const optsArea = _ticketsOpts.areas.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a.trim())}</option>`).join("");
+  const optsUrg = _ticketsOpts.urgencias.map((u) => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
+
+  const html = `
+    <div id="ticket-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target.id==='ticket-modal')cerrarCrearTicket()">
+      <div style="background:#fff;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h3 style="margin:0;">🔧 Reportar problema</h3>
+          <button onclick="cerrarCrearTicket()" style="background:none;border:0;font-size:28px;line-height:1;color:#94a3b8;">×</button>
+        </div>
+        <p style="font-size:12px;color:#64748b;margin-bottom:14px;">Vicente revisa y asigna ejecutor.</p>
+        <form id="ticket-form" onsubmit="event.preventDefault();guardarTicket();">
+          <div class="form-group">
+            <label>Descripción del problema *</label>
+            <textarea id="tk-desc" rows="3" required placeholder="Ej: La llave de la cocina gotea desde ayer"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Negocio *</label>
+            <select id="tk-negocio" required>
+              <option value="">— Elegí —</option>${optsNeg}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Área *</label>
+            <select id="tk-area" required>
+              <option value="">— Elegí —</option>${optsArea}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Urgencia sugerida</label>
+            <select id="tk-urgencia">
+              <option value="">— Dejar que Claude la clasifique —</option>${optsUrg}
+            </select>
+          </div>
+          <div id="tk-feedback" style="margin-top:10px;"></div>
+          <button type="submit" id="tk-submit-btn" class="btn btn-primary btn-block">Crear ticket</button>
+        </form>
+      </div>
+    </div>
+  `;
+  const c = document.createElement("div");
+  c.innerHTML = html;
+  document.body.appendChild(c.firstElementChild);
+}
+
+function cerrarCrearTicket() {
+  const m = document.getElementById("ticket-modal");
+  if (m) m.remove();
+}
+
+async function guardarTicket() {
+  const btn = document.getElementById("tk-submit-btn");
+  const fb = document.getElementById("tk-feedback");
+  btn.disabled = true; btn.textContent = "Guardando...";
+  try {
+    const payload = {
+      descripcion: document.getElementById("tk-desc").value.trim(),
+      negocio: document.getElementById("tk-negocio").value,
+      area: document.getElementById("tk-area").value,
+      urgencia_reportada: document.getElementById("tk-urgencia").value || undefined,
+    };
+    const r = await api("POST", "/api/tickets", payload);
+    fb.innerHTML = `<div style="color:#065f46;background:#d1fae5;padding:10px;border-radius:8px;font-size:13px;">✅ ${r.mensaje}</div>`;
+    setTimeout(() => {
+      cerrarCrearTicket();
+      cargados.mantenimiento = false;
+      loadTickets();
+    }, 1200);
+  } catch (e) {
+    fb.innerHTML = `<div style="color:#991b1b;background:#fee2e2;padding:10px;border-radius:8px;font-size:13px;">${e.message}</div>`;
+    btn.disabled = false; btn.textContent = "Crear ticket";
   }
 }
 
