@@ -754,7 +754,7 @@ router.patch("/tickets/:id", requireAuth(OPERATIVO), async (req, res) => {
     if (!id || !id.startsWith("rec")) {
       return res.status(400).json({ error: "ID inválido" });
     }
-    const { descripcion, negocio, area, urgencia_reportada, estado, notas } = req.body || {};
+    const { descripcion, negocio, area, urgencia_reportada, estado, notas, fecha_compromiso, materiales } = req.body || {};
     // Validaciones
     if (descripcion !== undefined && (typeof descripcion !== "string" || descripcion.trim().length < 3)) {
       return res.status(400).json({ error: "Descripción mín 3 chars" });
@@ -771,6 +771,9 @@ router.patch("/tickets/:id", requireAuth(OPERATIVO), async (req, res) => {
     if (estado && !mantenimiento.ESTADOS_VALIDOS.includes(estado)) {
       return res.status(400).json({ error: "Estado no válido", validos: mantenimiento.ESTADOS_VALIDOS });
     }
+    if (fecha_compromiso !== undefined && fecha_compromiso !== "" && fecha_compromiso !== null && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_compromiso)) {
+      return res.status(400).json({ error: "Fecha compromiso debe ser YYYY-MM-DD" });
+    }
     const updated = await mantenimiento.updateTicket(id, {
       descripcion: descripcion !== undefined ? descripcion.trim() : undefined,
       negocio,
@@ -778,6 +781,8 @@ router.patch("/tickets/:id", requireAuth(OPERATIVO), async (req, res) => {
       urgenciaReportada: urgencia_reportada,
       estado,
       notas,
+      fechaCompromiso: fecha_compromiso,
+      materiales,
     });
     if (!updated) {
       return res.status(400).json({ error: "No hay campos para actualizar" });

@@ -109,7 +109,7 @@ const ESTADOS_VALIDOS = [
 ];
 
 // Actualiza ticket. Solo acepta campos editables por Lili (NO ejecutor asignado).
-async function updateTicket(ticketId, { descripcion, negocio, area, urgenciaReportada, estado, notas }) {
+async function updateTicket(ticketId, { descripcion, negocio, area, urgenciaReportada, estado, notas, fechaCompromiso, materiales }) {
   const fields = {};
   if (descripcion !== undefined) fields["Descripción del problema"] = descripcion;
   if (negocio !== undefined) fields["Negocio"] = negocio;
@@ -117,6 +117,8 @@ async function updateTicket(ticketId, { descripcion, negocio, area, urgenciaRepo
   if (urgenciaReportada !== undefined) fields["Urgencia reportada"] = urgenciaReportada;
   if (estado !== undefined) fields["Estado"] = estado;
   if (notas !== undefined) fields["Notes"] = notas;
+  if (fechaCompromiso !== undefined) fields["Fecha compromiso"] = fechaCompromiso || null;
+  if (materiales !== undefined) fields["Materiales necesarios"] = materiales;
   if (estado === "Cerrado") {
     fields["Fecha de cierre"] = new Date().toISOString().slice(0, 10);
   }

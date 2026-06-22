@@ -384,6 +384,15 @@ async function abrirEditarTicket(ticket) {
             <select id="tke-estado">${optsEst}</select>
             <p style="font-size:11px;color:#64748b;margin-top:4px;">Si lo marcás "Cerrado", se llena la fecha de cierre automático.</p>
           </div>
+          <div class="form-group">
+            <label>📅 Fecha compromiso (cuándo se resolverá)</label>
+            <input type="date" id="tke-fecha-compromiso" value="${escapeHtml(ticket.fecha_compromiso || "")}">
+            <p style="font-size:11px;color:#64748b;margin-top:4px;">Dejá vacío si todavía no hay fecha acordada.</p>
+          </div>
+          <div class="form-group">
+            <label>🧰 Materiales necesarios (opcional)</label>
+            <textarea id="tke-materiales" rows="2" placeholder="Lista lo que hace falta...">${escapeHtml(ticket.materiales || "")}</textarea>
+          </div>
           <div id="tke-feedback" style="margin-top:10px;"></div>
           <button type="submit" id="tke-submit-btn" class="btn btn-primary btn-block">💾 Guardar cambios</button>
           ${ticket.estado !== "Cancelada" && ticket.estado !== "Cancelado" ? `<button type="button" onclick="cancelarTicket('${escapeHtml(ticket.id)}')" class="btn btn-block" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;margin-top:8px;">❌ Cancelar ticket</button>` : ""}
@@ -407,12 +416,16 @@ async function guardarEdicionTicket() {
   btn.disabled = true; btn.textContent = "Guardando...";
   try {
     const id = document.getElementById("tke-id").value;
+    const fechaCompromiso = document.getElementById("tke-fecha-compromiso").value;
+    const materiales = document.getElementById("tke-materiales").value;
     const payload = {
       descripcion: document.getElementById("tke-desc").value.trim(),
       negocio: document.getElementById("tke-negocio").value,
       area: document.getElementById("tke-area").value,
       urgencia_reportada: document.getElementById("tke-urgencia").value || undefined,
       estado: document.getElementById("tke-estado").value,
+      fecha_compromiso: fechaCompromiso || "",
+      materiales: materiales || "",
     };
     const r = await api("PATCH", "/api/tickets/" + encodeURIComponent(id), payload);
     fb.innerHTML = `<div style="color:#065f46;background:#d1fae5;padding:10px;border-radius:8px;font-size:13px;">✅ ${r.mensaje}</div>`;
