@@ -122,7 +122,7 @@ function simplifyCotorreo(r) {
 // Devuelve { alpadel: [], cotorreo: [], desde, hasta }
 // Excluye reservas Canceladas para no llenar el calendario de ruido
 // ===========================
-router.get("/reservas/calendario", requireAuth(OPERATIVO), async (req, res) => {
+router.get("/reservas/calendario", requireAuth([...OPERATIVO, "maestro"]), async (req, res) => {
   try {
     const desde = req.query.desde || todayCR();
     const hasta = req.query.hasta || desde;

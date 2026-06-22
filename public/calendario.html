@@ -623,7 +623,7 @@
 
 <script src="/js/common.js"></script>
 <script>
-if (!requireRole(["lili", "gerencia", "saloneros"])) throw new Error("Sin permiso");
+if (!requireRole(["lili", "gerencia", "saloneros", "maestro"])) throw new Error("Sin permiso");
 
 const user = getUser();
 document.getElementById("headerUser").textContent = user.nombre + " · " + user.rol;
