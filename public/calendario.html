@@ -831,7 +831,8 @@ function renderSemana() {
 
   // Filas de horas
   for (const h of HORAS_OPERATIVAS) {
-    html += `<div class="week-hour-label">${String(h).padStart(2,"0")}:00</div>`;
+    const _p = h >= 12 ? "PM" : "AM"; const _h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+    html += `<div class="week-hour-label">${_h12}:00 ${_p}</div>`;
     for (let i = 0; i < 7; i++) {
       const d = sumarDias(lun, i);
       const dIso = isoCR(d);
@@ -958,11 +959,12 @@ function renderDia() {
     html += `<div class="day-col-header cotorreo">Mesas</div>`;
   }
 
-  // Slots de 30 min
+  // Slots de 30 min — label en formato 12h AM/PM
+  const _fmt12 = (hh, mm) => { const p = hh >= 12 ? "PM" : "AM"; const h12 = hh === 0 ? 12 : (hh > 12 ? hh - 12 : hh); return `${h12}:${String(mm).padStart(2,"0")} ${p}`; };
   for (let h = 7; h <= 22; h++) {
     for (const minSlot of [0, 30]) {
       if (h === 22 && minSlot === 30) continue;
-      html += `<div class="week-hour-label">${String(h).padStart(2,"0")}:${String(minSlot).padStart(2,"0")}</div>`;
+      html += `<div class="week-hour-label">${_fmt12(h, minSlot)}</div>`;
       if (state.filtros.alpadel) {
         html += `<div class="day-cell" data-cancha="Dobles" data-hora="${h}" data-min="${minSlot}" onclick="crearEnSlot('${dIso}', ${h}, ${minSlot}, 'alpadel', 'Dobles')"></div>`;
         html += `<div class="day-cell" data-cancha="Singles" data-hora="${h}" data-min="${minSlot}" onclick="crearEnSlot('${dIso}', ${h}, ${minSlot}, 'alpadel', 'Singles')"></div>`;
@@ -985,7 +987,10 @@ function pintarBloqueDia(r, tipo) {
   const { h, m } = horaCR(r.fechaHora);
   if (h < 7 || h > 22) return;
   const dur = tipo === "alpadel" ? (r.duracion || 1) : 1.5;
-  const slotHeight = 32;
+  // slotHeight DEBE coincidir con el alto real de .week-hour-label en CSS (48px).
+  // Antes estaba en 32 (alto de .day-cell), pero el grid usa el MAX de la fila → 48.
+  // Resultado: el bloque quedaba descolocado y la línea horizontal lo cortaba a la mitad.
+  const slotHeight = 48;
 
   let selector;
   if (tipo === "alpadel") selector = `.day-cell[data-cancha="${r.cancha}"][data-hora="${h}"][data-min="${m >= 30 ? 30 : 0}"]`;
