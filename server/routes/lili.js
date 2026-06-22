@@ -742,6 +742,54 @@ router.post("/tickets", requireAuth(OPERATIVO), async (req, res) => {
 });
 
 // ===========================
+// PATCH /api/tickets/:id — editar ticket (estado, descripción, negocio, área, urgencia)
+// NO permite cambiar Ejecutor asignado.
+// ===========================
+router.patch("/tickets/:id", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    if (!mantenimiento.isConfigured()) {
+      return res.status(500).json({ error: "Mantenimiento no configurado" });
+    }
+    const { id } = req.params;
+    if (!id || !id.startsWith("rec")) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    const { descripcion, negocio, area, urgencia_reportada, estado, notas } = req.body || {};
+    // Validaciones
+    if (descripcion !== undefined && (typeof descripcion !== "string" || descripcion.trim().length < 3)) {
+      return res.status(400).json({ error: "Descripción mín 3 chars" });
+    }
+    if (negocio && !mantenimiento.NEGOCIOS_VALIDOS.includes(negocio)) {
+      return res.status(400).json({ error: "Negocio no válido", validos: mantenimiento.NEGOCIOS_VALIDOS });
+    }
+    if (area && !mantenimiento.AREAS_VALIDAS.includes(area)) {
+      return res.status(400).json({ error: "Área no válida", validas: mantenimiento.AREAS_VALIDAS });
+    }
+    if (urgencia_reportada && !mantenimiento.URGENCIAS_VALIDAS.includes(urgencia_reportada)) {
+      return res.status(400).json({ error: "Urgencia no válida" });
+    }
+    if (estado && !mantenimiento.ESTADOS_VALIDOS.includes(estado)) {
+      return res.status(400).json({ error: "Estado no válido", validos: mantenimiento.ESTADOS_VALIDOS });
+    }
+    const updated = await mantenimiento.updateTicket(id, {
+      descripcion: descripcion !== undefined ? descripcion.trim() : undefined,
+      negocio,
+      area,
+      urgenciaReportada: urgencia_reportada,
+      estado,
+      notas,
+    });
+    if (!updated) {
+      return res.status(400).json({ error: "No hay campos para actualizar" });
+    }
+    res.json({ ok: true, ticket_id: id, mensaje: "Ticket actualizado" });
+  } catch (e) {
+    console.error("PATCH /tickets/:id", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
 // GET /api/tickets/opciones — devuelve dropdowns válidos
 // ===========================
 router.get("/tickets/opciones", requireAuth(OPERATIVO), async (req, res) => {
@@ -749,6 +797,7 @@ router.get("/tickets/opciones", requireAuth(OPERATIVO), async (req, res) => {
     negocios: mantenimiento.NEGOCIOS_VALIDOS,
     areas: mantenimiento.AREAS_VALIDAS,
     urgencias: mantenimiento.URGENCIAS_VALIDAS,
+    estados: mantenimiento.ESTADOS_VALIDOS,
   });
 });
 

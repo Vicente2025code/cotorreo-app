@@ -97,6 +97,34 @@ async function getUsuariosMap() {
   return map;
 }
 
+const ESTADOS_VALIDOS = [
+  "Nuevo",
+  "En revisión",
+  "Pendiente presupuesto",
+  "Asignado",
+  "En proceso",
+  "Vencido",
+  "Cerrado",
+  "Cancelado",
+];
+
+// Actualiza ticket. Solo acepta campos editables por Lili (NO ejecutor asignado).
+async function updateTicket(ticketId, { descripcion, negocio, area, urgenciaReportada, estado, notas }) {
+  const fields = {};
+  if (descripcion !== undefined) fields["Descripción del problema"] = descripcion;
+  if (negocio !== undefined) fields["Negocio"] = negocio;
+  if (area !== undefined) fields["Área"] = area;
+  if (urgenciaReportada !== undefined) fields["Urgencia reportada"] = urgenciaReportada;
+  if (estado !== undefined) fields["Estado"] = estado;
+  if (notas !== undefined) fields["Notes"] = notas;
+  if (estado === "Cerrado") {
+    fields["Fecha de cierre"] = new Date().toISOString().slice(0, 10);
+  }
+  if (!Object.keys(fields).length) return null;
+  const data = await callM("PATCH", `${encodeURIComponent("Tickets")}/${ticketId}`, { fields });
+  return data;
+}
+
 // Crea ticket con Estado="Nuevo". Reportado_por_id es el record id del usuario en tabla Usuarios.
 async function createTicket({ descripcion, negocio, area, urgenciaReportada, reportadoPorId, fotos }) {
   const fields = {
@@ -127,9 +155,11 @@ module.exports = {
   AREAS_VALIDAS,
   URGENCIAS_VALIDAS,
   ESTADOS_ACTIVOS,
+  ESTADOS_VALIDOS,
   callM,
   listTicketsActivos,
   getUsuariosMap,
   createTicket,
+  updateTicket,
   isConfigured,
 };
