@@ -591,8 +591,28 @@ router.get(
           return tieneLink || nombreMatch;
         })
         .map(simplifyAlpadel);
+
+      // PAGO AL MAESTRO (distinto al precio que se cobra al cliente):
+      //   Singles                : ₡2,500/h
+      //   Dobles AM  (<16:00 CR) : ₡4,000/h
+      //   Dobles PM (≥16:00 CR)  : ₡8,000/h
+      // Aplica IGUAL para todos los maestros. La tarifa del campo {Precio} de
+      // Airtable es lo que se le cobra al cliente, NO lo que se le paga al
+      // maestro — por eso aquí lo recalculamos.
+      function tarifaMaestro(cancha, fechaHoraISO) {
+        if (cancha === "Singles") return 2500;
+        const d = new Date(fechaHoraISO);
+        // CR es UTC-6, ningún DST.
+        const horaCR = (d.getUTCHours() - 6 + 24) % 24;
+        return horaCR >= 16 ? 8000 : 4000;
+      }
+      reservas.forEach((x) => {
+        x.tarifaMaestroHora = tarifaMaestro(x.cancha, x.fechaHora);
+        x.pagoMaestro = x.tarifaMaestroHora * (x.duracion || 0);
+      });
       const totalHoras = reservas.reduce((s, x) => s + (x.duracion || 0), 0);
-      const totalAFacturar = reservas.reduce((s, x) => s + (x.precio || 0), 0);
+      // totalAFacturar = lo que el GRUPO debe pagar AL MAESTRO (usando tarifa maestro)
+      const totalAFacturar = reservas.reduce((s, x) => s + (x.pagoMaestro || 0), 0);
 
       res.json({
         mes,
