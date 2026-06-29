@@ -558,9 +558,12 @@ router.get(
       const lastDay = new Date(year, month, 0).getDate();
       const fin = `${mes}-${String(lastDay).padStart(2, "0")}T23:59:59-06:00`;
 
+      // NOTA: NO usamos FIND(id, ARRAYJOIN({Maestro})) porque las fórmulas Airtable
+      // sobre linked records devuelven el primary field (nombre), no el recordId.
+      // Filtramos en Airtable por Tipo/Estado/Fechas y por recordId en JS.
       const formula = `AND(
-        FIND('${id}', ARRAYJOIN({Maestro})) > 0,
         {Tipo de reserva}='Maestro',
+        OR({Estado}='Confirmada', {Estado}='Completada'),
         IS_AFTER({Fecha y hora inicio}, '${inicio}'),
         IS_BEFORE({Fecha y hora inicio}, '${fin}')
       )`.replace(/\s+/g, " ");
@@ -570,7 +573,9 @@ router.get(
         sort: [{ field: "Fecha y hora inicio", direction: "asc" }],
       });
 
-      const reservas = r.records.map(simplifyAlpadel);
+      const reservas = r.records
+        .filter((rec) => Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id))
+        .map(simplifyAlpadel);
       const totalHoras = reservas.reduce((s, x) => s + (x.duracion || 0), 0);
       const totalAFacturar = reservas.reduce((s, x) => s + (x.precio || 0), 0);
 
