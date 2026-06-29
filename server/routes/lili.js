@@ -558,14 +558,24 @@ router.get(
       const lastDay = new Date(year, month, 0).getDate();
       const fin = `${mes}-${String(lastDay).padStart(2, "0")}T23:59:59-06:00`;
 
-      // NOTA: NO usamos FIND(id, ARRAYJOIN({Maestro})) porque las fórmulas Airtable
-      // sobre linked records devuelven el primary field (nombre), no el recordId.
-      // Filtramos en Airtable por Tipo/Estado/Fechas y por recordId en JS.
+      // Necesitamos el nombre del maestro para también buscar reservas donde el
+      // cliente sea el propio maestro (caso: reservó como Regular antes de ser
+      // dado de alta como maestro). Petición de Vicente: contar TODAS las
+      // reservas del maestro, no solo las marcadas Tipo='Maestro'.
+      const maestroRec = await get(TABLES.Maestros, id);
+      const nombreMaestro = (maestroRec.fields.Nombre || "").trim();
+      // Escape simple para apóstrofos en el nombre (no esperado en estos casos).
+      const nombreSafe = nombreMaestro.replace(/'/g, "\\'");
+
+      // Filtramos en Airtable por estado y fechas. La inclusión por maestro o
+      // por nombre se hace en JS porque ARRAYJOIN sobre linked records devuelve
+      // el primary field (no el recordId) y mezclarlo con un OR por nombre se
+      // vuelve complicado.
       const formula = `AND(
-        {Tipo de reserva}='Maestro',
         OR({Estado}='Confirmada', {Estado}='Completada'),
         IS_AFTER({Fecha y hora inicio}, '${inicio}'),
-        IS_BEFORE({Fecha y hora inicio}, '${fin}')
+        IS_BEFORE({Fecha y hora inicio}, '${fin}'),
+        OR({Tipo de reserva}='Maestro', LOWER(TRIM({Nombre cliente}))=LOWER('${nombreSafe}'))
       )`.replace(/\s+/g, " ");
 
       const r = await list(TABLES.ReservasAlpadel, {
@@ -573,8 +583,13 @@ router.get(
         sort: [{ field: "Fecha y hora inicio", direction: "asc" }],
       });
 
+      const nombreLower = nombreMaestro.toLowerCase();
       const reservas = r.records
-        .filter((rec) => Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id))
+        .filter((rec) => {
+          const tieneLink = Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id);
+          const nombreMatch = (rec.fields["Nombre cliente"] || "").trim().toLowerCase() === nombreLower;
+          return tieneLink || nombreMatch;
+        })
         .map(simplifyAlpadel);
       const totalHoras = reservas.reduce((s, x) => s + (x.duracion || 0), 0);
       const totalAFacturar = reservas.reduce((s, x) => s + (x.precio || 0), 0);
