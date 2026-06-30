@@ -23,6 +23,7 @@
     <button class="tab active" data-tab="proximas">Próximas</button>
     <a class="tab" href="/calendario.html" style="text-decoration: none;">📅 Calendario</a>
     <button class="tab" data-tab="nueva">+ Nueva</button>
+    <button class="tab" data-tab="recurrentes">🔁 Recurrentes</button>
     <button class="tab" data-tab="factura">Mi mes</button>
   </div>
 
@@ -49,6 +50,36 @@
     </div>
   </div>
 
+  <div class="tab-content" id="tab-recurrentes">
+    <div class="card">
+      <h3>🔁 Mis clases recurrentes</h3>
+      <p class="hint" style="margin-bottom:14px;">Crea una vez y se repite cada semana mientras esté activa. Si pones notas, te ayuda a recordar el alumno o grupo.</p>
+      <div id="recurrentes-list" class="loading">Cargando…</div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border);">
+      <h4 style="margin-bottom:10px;">+ Nueva recurrente</h4>
+      <div class="form-group"><label>Día de la semana</label><select id="rec-dia" required>
+        <option value="">Selecciona...</option>
+        <option value="Lunes">Lunes</option>
+        <option value="Martes">Martes</option>
+        <option value="Miércoles">Miércoles</option>
+        <option value="Jueves">Jueves</option>
+        <option value="Viernes">Viernes</option>
+        <option value="Sábado">Sábado</option>
+        <option value="Domingo">Domingo</option>
+      </select></div>
+      <div class="form-group"><label>Hora inicio</label><select id="rec-hora-ini" required></select></div>
+      <div class="form-group"><label>Hora fin</label><select id="rec-hora-fin" required></select></div>
+      <div class="form-group"><label>Cancha</label><select id="rec-cancha" required>
+        <option value="Dobles">Cancha 1 — Dobles (grande)</option>
+        <option value="Singles">Cancha 2 — Singles (pequeña)</option>
+      </select></div>
+      <div class="form-group"><label>Desde</label><input type="date" id="rec-desde" required></div>
+      <div class="form-group"><label>Hasta</label><input type="date" id="rec-hasta" required></div>
+      <div class="form-group"><label>Notas (opcional)</label><textarea id="rec-notas" placeholder="Alumno o grupo, equipo, etc."></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="crearRecurrente()">Crear recurrente</button>
+    </div>
+  </div>
+
   <div class="tab-content" id="tab-factura">
     <div class="card">
       <h3>📊 Mi mes</h3>
@@ -72,6 +103,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "factura") loadFactura();
+    if (btn.dataset.tab === "recurrentes") loadRecurrentes();
   });
 });
 
@@ -157,6 +189,86 @@ async function loadFactura() {
     `;
   } catch (e) {
     document.getElementById("factura-info").innerHTML = "Error: " + e.message;
+  }
+}
+
+// Llenar selects de horas (recurrentes) con label 12h AM/PM y value 24h.
+(function pobrarHorasRecurrentes() {
+  const to12 = (h, m) => { const p = h >= 12 ? "PM" : "AM"; const h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h); return `${h12}:${m} ${p}`; };
+  ["rec-hora-ini", "rec-hora-fin"].forEach(id => {
+    const sel = document.getElementById(id);
+    let html = '<option value="">Selecciona...</option>';
+    for (let i = 7; i <= 22; i++) {
+      html += `<option value="${String(i).padStart(2,"0")}:00">${to12(i,"00")}</option>`;
+      if (i < 22) html += `<option value="${String(i).padStart(2,"0")}:30">${to12(i,"30")}</option>`;
+    }
+    sel.innerHTML = html;
+  });
+})();
+
+async function loadRecurrentes() {
+  try {
+    const r = await api("GET", "/api/mis-recurrentes");
+    const list = document.getElementById("recurrentes-list");
+    if (!r.recurrentes.length) {
+      list.innerHTML = '<div class="hint" style="text-align:center;padding:12px;">No tenés recurrentes activas todavía. Agregá una abajo.</div>';
+      return;
+    }
+    const to12label = (s) => { if(!s) return ""; const [hh,mm] = s.split(":").map(x => parseInt(x,10) || 0); const p = hh >= 12 ? "PM" : "AM"; const h12 = hh === 0 ? 12 : (hh > 12 ? hh - 12 : hh); return `${h12}:${String(mm).padStart(2,"0")} ${p}`; };
+    list.innerHTML = r.recurrentes.map(x => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="font-weight:600;margin-bottom:4px;">🔁 ${x.diaSemana} · ${to12label(x.horaInicio)} – ${to12label(x.horaFin)}</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">${x.cancha === "Singles" ? "Cancha 2 — Singles (pequeña)" : "Cancha 1 — Dobles (grande)"}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Vigente del ${x.fechaInicio} al ${x.fechaFin}</div>
+        ${x.notas ? `<div style="font-size:12px;margin-top:6px;font-style:italic;">${x.notas}</div>` : ""}
+        <button class="btn btn-warn btn-sm" style="margin-top:8px;" onclick="desactivarRecurrente('${x.id}')">Desactivar</button>
+      </div>
+    `).join("");
+  } catch (e) {
+    document.getElementById("recurrentes-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+async function crearRecurrente() {
+  const body = {
+    diaSemana: document.getElementById("rec-dia").value,
+    horaInicio: document.getElementById("rec-hora-ini").value,
+    horaFin: document.getElementById("rec-hora-fin").value,
+    cancha: document.getElementById("rec-cancha").value,
+    fechaInicio: document.getElementById("rec-desde").value,
+    fechaFin: document.getElementById("rec-hasta").value,
+    notas: document.getElementById("rec-notas").value.trim() || undefined,
+  };
+  if (!body.diaSemana || !body.horaInicio || !body.horaFin || !body.cancha || !body.fechaInicio || !body.fechaFin) {
+    alert("Faltan datos. Completá todos los campos obligatorios.");
+    return;
+  }
+  if (body.horaFin <= body.horaInicio) {
+    alert("La hora fin debe ser posterior a la hora inicio.");
+    return;
+  }
+  try {
+    await api("POST", "/api/mi-recurrente", body);
+    alert("✅ Recurrente creada");
+    document.getElementById("rec-dia").value = "";
+    document.getElementById("rec-hora-ini").value = "";
+    document.getElementById("rec-hora-fin").value = "";
+    document.getElementById("rec-desde").value = "";
+    document.getElementById("rec-hasta").value = "";
+    document.getElementById("rec-notas").value = "";
+    loadRecurrentes();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+async function desactivarRecurrente(id) {
+  if (!confirm("¿Desactivar esta recurrente? Las clases que ya están en el calendario se quedan; solo deja de generarse en el futuro.")) return;
+  try {
+    await api("DELETE", "/api/mi-recurrente/" + id);
+    loadRecurrentes();
+  } catch (e) {
+    alert("Error: " + e.message);
   }
 }
 

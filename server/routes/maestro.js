@@ -179,4 +179,86 @@ router.get("/mi-facturacion", requireAuth(["maestro"]), async (req, res) => {
   }
 });
 
+// ===========================
+// GET /api/mis-recurrentes  — recurrentes ACTIVAS del maestro logueado
+// ===========================
+router.get("/mis-recurrentes", requireAuth(["maestro"]), async (req, res) => {
+  try {
+    const id = req.user.recordId;
+    const r = await list(TABLES.RecurrentesAlpadel, {
+      filterByFormula: `{Activa}=TRUE()`,
+    });
+    // Mismo bug de ARRAYJOIN sobre linked records: filtrar en JS.
+    const mias = r.records
+      .filter((rec) => Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id))
+      .map((rec) => ({
+        id: rec.id,
+        referencia: rec.fields.Referencia,
+        cancha: rec.fields.Cancha,
+        diaSemana: rec.fields["Día semana"],
+        horaInicio: rec.fields["Hora inicio"],
+        horaFin: rec.fields["Hora fin"],
+        fechaInicio: rec.fields["Fecha inicio"],
+        fechaFin: rec.fields["Fecha fin"],
+        tipo: rec.fields.Tipo,
+        notas: rec.fields.Notas,
+      }));
+    res.json({ recurrentes: mias });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
+// POST /api/mi-recurrente  — crear recurrente del maestro
+// Body: { cancha, diaSemana, horaInicio, horaFin, fechaInicio, fechaFin, notas? }
+// ===========================
+router.post("/mi-recurrente", requireAuth(["maestro"]), async (req, res) => {
+  try {
+    const { cancha, diaSemana, horaInicio, horaFin, fechaInicio, fechaFin, notas } = req.body;
+    if (!cancha || !diaSemana || !horaInicio || !horaFin || !fechaInicio || !fechaFin) {
+      return res.status(400).json({ error: "Faltan datos básicos" });
+    }
+    if (horaFin <= horaInicio) {
+      return res.status(400).json({ error: "La hora fin debe ser posterior a la hora inicio" });
+    }
+    const m = await get(TABLES.Maestros, req.user.recordId);
+    const referencia = `Recurrente · ${m.fields.Nombre} · ${diaSemana} ${horaInicio}–${horaFin}`;
+    const fields = {
+      Referencia: referencia,
+      Cancha: cancha,
+      "Día semana": diaSemana,
+      "Hora inicio": horaInicio,
+      "Hora fin": horaFin,
+      "Fecha inicio": fechaInicio,
+      "Fecha fin": fechaFin,
+      Tipo: "Maestro",
+      Activa: true,
+      Maestro: [req.user.recordId],
+      Notas: notas || undefined,
+    };
+    const r = await create(TABLES.RecurrentesAlpadel, fields, { typecast: true });
+    res.json({ ok: true, id: r.id, referencia });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
+// DELETE /api/mi-recurrente/:id  — desactivar (no borrar) recurrente propia
+// ===========================
+router.delete("/mi-recurrente/:id", requireAuth(["maestro"]), async (req, res) => {
+  try {
+    const rec = await get(TABLES.RecurrentesAlpadel, req.params.id);
+    const maestros = rec.fields.Maestro || [];
+    if (!maestros.includes(req.user.recordId)) {
+      return res.status(403).json({ error: "No puedes desactivar recurrentes de otros" });
+    }
+    await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
