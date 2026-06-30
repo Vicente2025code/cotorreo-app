@@ -485,6 +485,135 @@ router.get("/recurrentes", requireAuth(OPERATIVO), async (_req, res) => {
   }
 });
 
+// DELETE /api/recurrentes/:id — desactivar (Activa=false)
+router.delete("/recurrentes/:id", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/recurrentes/generar?dias=30 — materializa las recurrentes activas
+// en reservas individuales para los próximos N días. Idempotente: no duplica
+// si ya existe una reserva con la misma recurrente origen y el mismo Fecha y
+// hora inicio. Saltea horas que ya pasaron.
+router.post("/recurrentes/generar", requireAuth(OPERATIVO), async (req, res) => {
+  try {
+    const dias = Math.max(1, Math.min(120, parseInt(req.body.dias || req.query.dias || 30, 10) || 30));
+
+    // Mapa "Día semana" Airtable -> getUTCDay() (0=Dom, 1=Lun...)
+    const DIAS_NUM = { "Domingo": 0, "Lunes": 1, "Martes": 2, "Miércoles": 3, "Jueves": 4, "Viernes": 5, "Sábado": 6 };
+
+    const recurResp = await list(TABLES.RecurrentesAlpadel, { filterByFormula: `{Activa}=TRUE()` });
+    if (!recurResp.records.length) {
+      return res.json({ ok: true, dias_ventana: dias, recurrentes_activas: 0, creadas: 0, saltadas: 0, detalles: [] });
+    }
+
+    // Traer reservas ya existentes en la ventana que provienen de alguna recurrente
+    // — para detectar duplicados (idempotencia).
+    const ahora = new Date();
+    const hasta = new Date(ahora.getTime() + dias * 86400000);
+    const existentesResp = await list(TABLES.ReservasAlpadel, {
+      filterByFormula: `AND( IS_AFTER({Fecha y hora inicio}, '${ahora.toISOString()}'), IS_BEFORE({Fecha y hora inicio}, '${hasta.toISOString()}'), NOT({Reserva recurrente origen}='') )`.replace(/\s+/g, " "),
+    });
+    const yaExisten = new Set();
+    for (const r of existentesResp.records) {
+      const recurId = (r.fields["Reserva recurrente origen"] || [])[0];
+      const fecha = r.fields["Fecha y hora inicio"];
+      if (recurId && fecha) yaExisten.add(`${recurId}|${fecha}`);
+    }
+
+    let creadas = 0, saltadas = 0;
+    const detalles = [];
+
+    for (const recur of recurResp.records) {
+      const f = recur.fields;
+      const diaNum = DIAS_NUM[f["Día semana"]];
+      if (diaNum == null) continue;
+      if (!f.Cancha || !f["Hora inicio"] || !f["Hora fin"]) continue;
+
+      const fechaInicio = f["Fecha inicio"] ? new Date(f["Fecha inicio"] + "T00:00:00-06:00") : new Date(0);
+      const fechaFin = f["Fecha fin"] ? new Date(f["Fecha fin"] + "T23:59:59-06:00") : new Date("2099-12-31T00:00:00Z");
+      const desde = new Date(Math.max(ahora.getTime(), fechaInicio.getTime()));
+      const limite = new Date(Math.min(hasta.getTime(), fechaFin.getTime()));
+
+      // Iterar día por día en la ventana
+      let cursor = new Date(desde);
+      cursor.setUTCHours(12, 0, 0, 0); // mediodía UTC para evitar bordes de DST/UTC
+      while (cursor.getTime() <= limite.getTime()) {
+        // Día de la semana visto desde CR
+        const crDayShift = new Date(cursor.getTime() - 6 * 3600 * 1000);
+        if (crDayShift.getUTCDay() === diaNum) {
+          // Construir fecha YYYY-MM-DD CR
+          const y = crDayShift.getUTCFullYear();
+          const mo = String(crDayShift.getUTCMonth() + 1).padStart(2, "0");
+          const d = String(crDayShift.getUTCDate()).padStart(2, "0");
+          const fechaCR = `${y}-${mo}-${d}`;
+          const startCR = new Date(`${fechaCR}T${f["Hora inicio"]}:00-06:00`);
+          const endCR = new Date(`${fechaCR}T${f["Hora fin"]}:00-06:00`);
+
+          if (startCR.getTime() <= Date.now()) {
+            saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
+          }
+          const key = `${recur.id}|${startCR.toISOString()}`;
+          if (yaExisten.has(key)) {
+            saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
+          }
+
+          const fields = {
+            "Fecha y hora inicio": startCR.toISOString(),
+            "Hora fin": endCR.toISOString(),
+            Cancha: f.Cancha,
+            Estado: "Confirmada",
+            "Tipo de reserva": f.Tipo || "Regular",
+            "Reserva recurrente origen": [recur.id],
+            Referencia: f.Referencia,
+            Notas: f.Notas || undefined,
+          };
+          const cliente = (f.Cliente || [])[0];
+          const maestro = (f.Maestro || [])[0];
+          if (cliente) fields.Cliente = [cliente];
+          if (maestro) {
+            fields.Maestro = [maestro];
+            // Heredar nombre del maestro como "Nombre cliente" si no hay cliente
+            if (!cliente) {
+              try {
+                const m = await get(TABLES.Maestros, maestro);
+                fields["Nombre cliente"] = m.fields.Nombre;
+              } catch (_) {}
+            }
+          }
+
+          try {
+            await create(TABLES.ReservasAlpadel, fields, { typecast: true });
+            yaExisten.add(key);
+            creadas++;
+            if (detalles.length < 50) detalles.push(`${f.Referencia || "(s/r)"} → ${fechaCR} ${f["Hora inicio"]}`);
+          } catch (e) {
+            saltadas++;
+            console.error("recurrentes/generar create error", e.message);
+          }
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+
+    res.json({
+      ok: true,
+      dias_ventana: dias,
+      recurrentes_activas: recurResp.records.length,
+      creadas,
+      saltadas,
+      detalles,
+    });
+  } catch (e) {
+    console.error("POST /recurrentes/generar", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post("/recurrentes", requireAuth(OPERATIVO), async (req, res) => {
   try {
     const {

@@ -99,7 +99,10 @@
   <div class="tab-content" id="tab-recurrentes">
     <div class="card">
       <h3>🔁 Reservas recurrentes activas</h3>
-      <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()" style="margin-bottom:12px;">+ Nueva recurrente</button>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()">+ Nueva recurrente</button>
+        <button class="btn btn-sm" onclick="generarRecurrentes()" title="Genera las próximas reservas individuales en el calendario a partir de las recurrentes activas. Idempotente: no duplica.">⚙ Generar próximos 30 días</button>
+      </div>
       <div id="recurrentes-list" class="loading">Cargando</div>
       <div id="recurrente-form" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
         <h4 style="margin-bottom:10px;">+ Nueva recurrente de maestro</h4>
@@ -803,11 +806,17 @@ async function loadRecurrentes() {
       document.getElementById("recurrentes-list").innerHTML = "<em>Sin recurrentes</em>";
       return;
     }
+    const to12 = (s) => { if(!s) return ""; const [hh,mm] = s.split(":").map(x => parseInt(x,10) || 0); const p = hh >= 12 ? "PM" : "AM"; const h12 = hh === 0 ? 12 : (hh > 12 ? hh - 12 : hh); return `${h12}:${String(mm).padStart(2,"0")} ${p}`; };
     document.getElementById("recurrentes-list").innerHTML = data.recurrentes.map(r => `
-      <div class="card" style="margin-bottom:8px;">
-        <strong>${r.fields.Referencia}</strong><br>
-        ${r.fields["Día semana"]} ${r.fields["Hora inicio"]}-${r.fields["Hora fin"]} · ${r.fields.Cancha}<br>
-        <small>${fmtFechaCorta(r.fields["Fecha inicio"])} al ${fmtFechaCorta(r.fields["Fecha fin"])}</small>
+      <div class="card" style="margin-bottom:8px;padding:12px;">
+        <div style="font-weight:600;">${r.fields.Referencia || "(sin referencia)"}</div>
+        <div style="font-size:13px;color:var(--text-secondary);">
+          ${r.fields["Día semana"]} · ${to12(r.fields["Hora inicio"])} – ${to12(r.fields["Hora fin"])} · ${r.fields.Cancha}
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+          Vigente del ${fmtFechaCorta(r.fields["Fecha inicio"])} al ${fmtFechaCorta(r.fields["Fecha fin"])}
+        </div>
+        <button class="btn btn-warn btn-sm" style="margin-top:8px;" onclick="desactivarRecurrenteLili('${r.id}')">Desactivar</button>
       </div>
     `).join("");
   } catch (e) {
@@ -848,6 +857,26 @@ function cerrarCrearRecurrente() {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+}
+
+async function desactivarRecurrenteLili(id) {
+  if (!confirm("¿Desactivar esta recurrente?\n\nLas reservas que ya están en el calendario se quedan; solo deja de generar futuras.")) return;
+  try {
+    await api("DELETE", "/api/recurrentes/" + id);
+    loadRecurrentes();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+async function generarRecurrentes() {
+  if (!confirm("Generar reservas individuales para los próximos 30 días a partir de las recurrentes activas.\n\nNo crea duplicados ni horas ya pasadas.\n¿Continuar?")) return;
+  try {
+    const r = await api("POST", "/api/recurrentes/generar?dias=30");
+    alert(`✅ Generación completa\n\nRecurrentes activas: ${r.recurrentes_activas}\nReservas creadas: ${r.creadas}\nSaltadas (ya existen o pasadas): ${r.saltadas}`);
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
 }
 
 async function guardarRecurrenteLili() {
