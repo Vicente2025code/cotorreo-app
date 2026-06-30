@@ -495,23 +495,111 @@ router.delete("/recurrentes/:id", requireAuth(OPERATIVO), async (req, res) => {
   }
 });
 
+// Helper: materializa las reservas individuales de UNA recurrente desde
+// max(hoy, Fecha inicio) hasta Fecha fin. Idempotente. Exportada al final.
+// Usada tanto por el endpoint manual /recurrentes/generar como por los
+// POST /recurrentes y POST /mi-recurrente (auto-generación al crear).
+async function generarReservasParaRecurrente(recur, yaExisten = null) {
+  const DIAS_NUM = { "Domingo": 0, "Lunes": 1, "Martes": 2, "Miércoles": 3, "Jueves": 4, "Viernes": 5, "Sábado": 6 };
+  const f = recur.fields;
+  const diaNum = DIAS_NUM[f["Día semana"]];
+  if (diaNum == null || !f.Cancha || !f["Hora inicio"] || !f["Hora fin"]) {
+    return { creadas: 0, saltadas: 0, detalles: [] };
+  }
+  const ahora = new Date();
+  const fechaInicio = f["Fecha inicio"] ? new Date(f["Fecha inicio"] + "T00:00:00-06:00") : ahora;
+  const fechaFin = f["Fecha fin"]
+    ? new Date(f["Fecha fin"] + "T23:59:59-06:00")
+    : new Date(ahora.getTime() + 365 * 86400000);
+  const desde = new Date(Math.max(ahora.getTime(), fechaInicio.getTime()));
+  const limite = fechaFin;
+
+  // Si no recibimos el set de existentes, lo construimos consultando Airtable
+  // para esta recurrente puntual.
+  if (yaExisten == null) {
+    yaExisten = new Set();
+    const existentes = await list(TABLES.ReservasAlpadel, {
+      filterByFormula: `AND( IS_AFTER({Fecha y hora inicio}, '${desde.toISOString()}'), IS_BEFORE({Fecha y hora inicio}, '${limite.toISOString()}'), NOT({Reserva recurrente origen}='') )`.replace(/\s+/g, " "),
+    });
+    for (const x of existentes.records) {
+      const recurId = (x.fields["Reserva recurrente origen"] || [])[0];
+      const fecha = x.fields["Fecha y hora inicio"];
+      if (recurId === recur.id && fecha) yaExisten.add(`${recurId}|${fecha}`);
+    }
+  }
+
+  let cursor = new Date(desde);
+  cursor.setUTCHours(12, 0, 0, 0);
+  let creadas = 0, saltadas = 0;
+  const detalles = [];
+
+  while (cursor.getTime() <= limite.getTime()) {
+    const crDayShift = new Date(cursor.getTime() - 6 * 3600 * 1000);
+    if (crDayShift.getUTCDay() === diaNum) {
+      const y = crDayShift.getUTCFullYear();
+      const mo = String(crDayShift.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(crDayShift.getUTCDate()).padStart(2, "0");
+      const fechaCR = `${y}-${mo}-${d}`;
+      const startCR = new Date(`${fechaCR}T${f["Hora inicio"]}:00-06:00`);
+      const endCR = new Date(`${fechaCR}T${f["Hora fin"]}:00-06:00`);
+
+      if (startCR.getTime() <= Date.now()) {
+        saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
+      }
+      const key = `${recur.id}|${startCR.toISOString()}`;
+      if (yaExisten.has(key)) {
+        saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
+      }
+
+      const fields = {
+        "Fecha y hora inicio": startCR.toISOString(),
+        "Hora fin": endCR.toISOString(),
+        Cancha: f.Cancha,
+        Estado: "Confirmada",
+        "Tipo de reserva": f.Tipo || "Regular",
+        "Reserva recurrente origen": [recur.id],
+        Referencia: f.Referencia,
+        Notas: f.Notas || undefined,
+      };
+      const cliente = (f.Cliente || [])[0];
+      const maestro = (f.Maestro || [])[0];
+      if (cliente) fields.Cliente = [cliente];
+      if (maestro) {
+        fields.Maestro = [maestro];
+        if (!cliente) {
+          try {
+            const m = await get(TABLES.Maestros, maestro);
+            fields["Nombre cliente"] = m.fields.Nombre;
+          } catch (_) {}
+        }
+      }
+      try {
+        await create(TABLES.ReservasAlpadel, fields, { typecast: true });
+        yaExisten.add(key);
+        creadas++;
+        if (detalles.length < 50) detalles.push(`${f.Referencia || "(s/r)"} → ${fechaCR} ${f["Hora inicio"]}`);
+      } catch (e) {
+        saltadas++;
+        console.error("generarReservasParaRecurrente create error", e.message);
+      }
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return { creadas, saltadas, detalles };
+}
+
 // POST /api/recurrentes/generar — materializa TODAS las reservas pendientes
-// de las recurrentes activas, desde hoy hasta la Fecha fin de cada recurrente.
-// Si una recurrente no tiene Fecha fin, usa tope de 1 año desde hoy.
-// Idempotente: usa el linked record 'Reserva recurrente origen' para detectar
-// duplicados. Salta horas que ya pasaron.
+// de las recurrentes activas. Útil como herramienta de mantenimiento o si
+// algo falló en la generación automática al crear.
 router.post("/recurrentes/generar", requireAuth(OPERATIVO), async (req, res) => {
   try {
-    // Mapa "Día semana" Airtable -> getUTCDay() (0=Dom, 1=Lun...)
-    const DIAS_NUM = { "Domingo": 0, "Lunes": 1, "Martes": 2, "Miércoles": 3, "Jueves": 4, "Viernes": 5, "Sábado": 6 };
-
     const recurResp = await list(TABLES.RecurrentesAlpadel, { filterByFormula: `{Activa}=TRUE()` });
     if (!recurResp.records.length) {
       return res.json({ ok: true, recurrentes_activas: 0, creadas: 0, saltadas: 0, detalles: [] });
     }
 
-    // Traer reservas ya existentes desde hoy hasta el MAX de fechas fin (o 1 año
-    // si nadie tiene Fecha fin) — para detectar duplicados (idempotencia).
+    // Traer todas las reservas ya existentes vinculadas a alguna recurrente,
+    // desde hoy hasta el MAX de fechas fin — para detectar duplicados.
     const ahora = new Date();
     const TOPE_DEFAULT = new Date(ahora.getTime() + 365 * 86400000);
     const fechasFin = recurResp.records
@@ -533,88 +621,18 @@ router.post("/recurrentes/generar", requireAuth(OPERATIVO), async (req, res) => 
 
     let creadas = 0, saltadas = 0;
     const detalles = [];
-
     for (const recur of recurResp.records) {
-      const f = recur.fields;
-      const diaNum = DIAS_NUM[f["Día semana"]];
-      if (diaNum == null) continue;
-      if (!f.Cancha || !f["Hora inicio"] || !f["Hora fin"]) continue;
-
-      const fechaInicio = f["Fecha inicio"] ? new Date(f["Fecha inicio"] + "T00:00:00-06:00") : ahora;
-      // Si la recurrente no tiene Fecha fin, usar tope 1 año desde hoy
-      const fechaFin = f["Fecha fin"]
-        ? new Date(f["Fecha fin"] + "T23:59:59-06:00")
-        : new Date(ahora.getTime() + 365 * 86400000);
-      const desde = new Date(Math.max(ahora.getTime(), fechaInicio.getTime()));
-      const limite = fechaFin;
-
-      // Iterar día por día en la ventana
-      let cursor = new Date(desde);
-      cursor.setUTCHours(12, 0, 0, 0); // mediodía UTC para evitar bordes de DST/UTC
-      while (cursor.getTime() <= limite.getTime()) {
-        // Día de la semana visto desde CR
-        const crDayShift = new Date(cursor.getTime() - 6 * 3600 * 1000);
-        if (crDayShift.getUTCDay() === diaNum) {
-          // Construir fecha YYYY-MM-DD CR
-          const y = crDayShift.getUTCFullYear();
-          const mo = String(crDayShift.getUTCMonth() + 1).padStart(2, "0");
-          const d = String(crDayShift.getUTCDate()).padStart(2, "0");
-          const fechaCR = `${y}-${mo}-${d}`;
-          const startCR = new Date(`${fechaCR}T${f["Hora inicio"]}:00-06:00`);
-          const endCR = new Date(`${fechaCR}T${f["Hora fin"]}:00-06:00`);
-
-          if (startCR.getTime() <= Date.now()) {
-            saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
-          }
-          const key = `${recur.id}|${startCR.toISOString()}`;
-          if (yaExisten.has(key)) {
-            saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
-          }
-
-          const fields = {
-            "Fecha y hora inicio": startCR.toISOString(),
-            "Hora fin": endCR.toISOString(),
-            Cancha: f.Cancha,
-            Estado: "Confirmada",
-            "Tipo de reserva": f.Tipo || "Regular",
-            "Reserva recurrente origen": [recur.id],
-            Referencia: f.Referencia,
-            Notas: f.Notas || undefined,
-          };
-          const cliente = (f.Cliente || [])[0];
-          const maestro = (f.Maestro || [])[0];
-          if (cliente) fields.Cliente = [cliente];
-          if (maestro) {
-            fields.Maestro = [maestro];
-            // Heredar nombre del maestro como "Nombre cliente" si no hay cliente
-            if (!cliente) {
-              try {
-                const m = await get(TABLES.Maestros, maestro);
-                fields["Nombre cliente"] = m.fields.Nombre;
-              } catch (_) {}
-            }
-          }
-
-          try {
-            await create(TABLES.ReservasAlpadel, fields, { typecast: true });
-            yaExisten.add(key);
-            creadas++;
-            if (detalles.length < 50) detalles.push(`${f.Referencia || "(s/r)"} → ${fechaCR} ${f["Hora inicio"]}`);
-          } catch (e) {
-            saltadas++;
-            console.error("recurrentes/generar create error", e.message);
-          }
-        }
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-      }
+      const r = await generarReservasParaRecurrente(recur, yaExisten);
+      creadas += r.creadas;
+      saltadas += r.saltadas;
+      detalles.push(...r.detalles);
     }
-
     res.json({
       ok: true,
       recurrentes_activas: recurResp.records.length,
       creadas,
       saltadas,
-      detalles,
+      detalles: detalles.slice(0, 50),
     });
   } catch (e) {
     console.error("POST /recurrentes/generar", e);
@@ -654,7 +672,15 @@ router.post("/recurrentes", requireAuth(OPERATIVO), async (req, res) => {
     const r = await create(TABLES.RecurrentesAlpadel, fields, {
       typecast: true,
     });
-    res.json({ ok: true, recurrente: r });
+    // Auto-generar las reservas pendientes de esta recurrente inmediatamente,
+    // así Lili NO tiene que apretar un botón "Generar" después.
+    let gen = { creadas: 0, saltadas: 0 };
+    try {
+      gen = await generarReservasParaRecurrente(r);
+    } catch (e) {
+      console.error("auto-generar tras POST /recurrentes:", e.message);
+    }
+    res.json({ ok: true, recurrente: r, reservas_generadas: gen.creadas, reservas_saltadas: gen.saltadas });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -990,3 +1016,4 @@ router.get("/tickets/opciones", requireAuth(OPERATIVO), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.generarReservasParaRecurrente = generarReservasParaRecurrente;

@@ -99,10 +99,7 @@
   <div class="tab-content" id="tab-recurrentes">
     <div class="card">
       <h3>🔁 Reservas recurrentes activas</h3>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()">+ Nueva recurrente</button>
-        <button class="btn btn-sm" onclick="generarRecurrentes()" title="Genera TODAS las reservas individuales pendientes de las recurrentes activas, hasta la Fecha fin de cada una. Idempotente: no duplica.">⚙ Generar todas las pendientes</button>
-      </div>
+      <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()" style="margin-bottom:12px;">+ Nueva recurrente</button>
       <div id="recurrentes-list" class="loading">Cargando</div>
       <div id="recurrente-form" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
         <h4 style="margin-bottom:10px;">+ Nueva recurrente de maestro</h4>
@@ -869,16 +866,6 @@ async function desactivarRecurrenteLili(id) {
   }
 }
 
-async function generarRecurrentes() {
-  if (!confirm("Generar TODAS las reservas pendientes de las recurrentes activas (hasta la Fecha fin de cada una).\n\nNo crea duplicados ni horas ya pasadas.\n¿Continuar?")) return;
-  try {
-    const r = await api("POST", "/api/recurrentes/generar");
-    alert(`✅ Generación completa\n\nRecurrentes activas: ${r.recurrentes_activas}\nReservas creadas: ${r.creadas}\nSaltadas (ya existen o pasadas): ${r.saltadas}`);
-  } catch (e) {
-    alert("Error: " + e.message);
-  }
-}
-
 async function guardarRecurrenteLili() {
   const maestroId = document.getElementById("recli-maestro").value;
   const diaSemana = document.getElementById("recli-dia").value;
@@ -900,11 +887,12 @@ async function guardarRecurrenteLili() {
   const maestroNombre = document.getElementById("recli-maestro").selectedOptions[0].textContent;
   const referencia = `Recurrente · ${maestroNombre} · ${diaSemana} ${horaInicio}–${horaFin}`;
   try {
-    await api("POST", "/api/recurrentes", {
+    const resp = await api("POST", "/api/recurrentes", {
       referencia, maestroId, tipo: "Maestro",
       cancha, diaSemana, horaInicio, horaFin, fechaInicio, fechaFin,
     });
-    alert("✅ Recurrente creada");
+    const n = resp.reservas_generadas || 0;
+    alert(`✅ Recurrente creada\n\n${n} clase${n === 1 ? "" : "s"} ya están en el calendario.`);
     cerrarCrearRecurrente();
     loadRecurrentes();
   } catch (e) {

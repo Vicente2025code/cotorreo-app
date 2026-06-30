@@ -10,6 +10,7 @@
 const express = require("express");
 const { TABLES, list, create, update, get, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
+const { generarReservasParaRecurrente } = require("./lili");
 
 const router = express.Router();
 
@@ -238,7 +239,14 @@ router.post("/mi-recurrente", requireAuth(["maestro"]), async (req, res) => {
       Notas: notas || undefined,
     };
     const r = await create(TABLES.RecurrentesAlpadel, fields, { typecast: true });
-    res.json({ ok: true, id: r.id, referencia });
+    // Auto-generar reservas inmediatamente — sin botón manual.
+    let gen = { creadas: 0, saltadas: 0 };
+    try {
+      gen = await generarReservasParaRecurrente(r);
+    } catch (e) {
+      console.error("auto-generar tras POST /mi-recurrente:", e.message);
+    }
+    res.json({ ok: true, id: r.id, referencia, reservas_generadas: gen.creadas, reservas_saltadas: gen.saltadas });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -248,8 +248,9 @@ async function crearRecurrente() {
     return;
   }
   try {
-    await api("POST", "/api/mi-recurrente", body);
-    alert("✅ Recurrente creada");
+    const resp = await api("POST", "/api/mi-recurrente", body);
+    const n = resp.reservas_generadas || 0;
+    alert(`✅ Recurrente creada\n\n${n} clase${n === 1 ? "" : "s"} ya están en el calendario.`);
     document.getElementById("rec-dia").value = "";
     document.getElementById("rec-hora-ini").value = "";
     document.getElementById("rec-hora-fin").value = "";
