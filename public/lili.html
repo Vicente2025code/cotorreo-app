@@ -101,7 +101,7 @@
       <h3>🔁 Reservas recurrentes activas</h3>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()">+ Nueva recurrente</button>
-        <button class="btn btn-sm" onclick="generarRecurrentes()" title="Genera las próximas reservas individuales en el calendario a partir de las recurrentes activas. Idempotente: no duplica.">⚙ Generar próximos 30 días</button>
+        <button class="btn btn-sm" onclick="generarRecurrentes()" title="Genera TODAS las reservas individuales pendientes de las recurrentes activas, hasta la Fecha fin de cada una. Idempotente: no duplica.">⚙ Generar todas las pendientes</button>
       </div>
       <div id="recurrentes-list" class="loading">Cargando</div>
       <div id="recurrente-form" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
@@ -870,9 +870,9 @@ async function desactivarRecurrenteLili(id) {
 }
 
 async function generarRecurrentes() {
-  if (!confirm("Generar reservas individuales para los próximos 30 días a partir de las recurrentes activas.\n\nNo crea duplicados ni horas ya pasadas.\n¿Continuar?")) return;
+  if (!confirm("Generar TODAS las reservas pendientes de las recurrentes activas (hasta la Fecha fin de cada una).\n\nNo crea duplicados ni horas ya pasadas.\n¿Continuar?")) return;
   try {
-    const r = await api("POST", "/api/recurrentes/generar?dias=30");
+    const r = await api("POST", "/api/recurrentes/generar");
     alert(`✅ Generación completa\n\nRecurrentes activas: ${r.recurrentes_activas}\nReservas creadas: ${r.creadas}\nSaltadas (ya existen o pasadas): ${r.saltadas}`);
   } catch (e) {
     alert("Error: " + e.message);

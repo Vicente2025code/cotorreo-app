@@ -495,26 +495,32 @@ router.delete("/recurrentes/:id", requireAuth(OPERATIVO), async (req, res) => {
   }
 });
 
-// POST /api/recurrentes/generar?dias=30 — materializa las recurrentes activas
-// en reservas individuales para los próximos N días. Idempotente: no duplica
-// si ya existe una reserva con la misma recurrente origen y el mismo Fecha y
-// hora inicio. Saltea horas que ya pasaron.
+// POST /api/recurrentes/generar — materializa TODAS las reservas pendientes
+// de las recurrentes activas, desde hoy hasta la Fecha fin de cada recurrente.
+// Si una recurrente no tiene Fecha fin, usa tope de 1 año desde hoy.
+// Idempotente: usa el linked record 'Reserva recurrente origen' para detectar
+// duplicados. Salta horas que ya pasaron.
 router.post("/recurrentes/generar", requireAuth(OPERATIVO), async (req, res) => {
   try {
-    const dias = Math.max(1, Math.min(120, parseInt(req.body.dias || req.query.dias || 30, 10) || 30));
-
     // Mapa "Día semana" Airtable -> getUTCDay() (0=Dom, 1=Lun...)
     const DIAS_NUM = { "Domingo": 0, "Lunes": 1, "Martes": 2, "Miércoles": 3, "Jueves": 4, "Viernes": 5, "Sábado": 6 };
 
     const recurResp = await list(TABLES.RecurrentesAlpadel, { filterByFormula: `{Activa}=TRUE()` });
     if (!recurResp.records.length) {
-      return res.json({ ok: true, dias_ventana: dias, recurrentes_activas: 0, creadas: 0, saltadas: 0, detalles: [] });
+      return res.json({ ok: true, recurrentes_activas: 0, creadas: 0, saltadas: 0, detalles: [] });
     }
 
-    // Traer reservas ya existentes en la ventana que provienen de alguna recurrente
-    // — para detectar duplicados (idempotencia).
+    // Traer reservas ya existentes desde hoy hasta el MAX de fechas fin (o 1 año
+    // si nadie tiene Fecha fin) — para detectar duplicados (idempotencia).
     const ahora = new Date();
-    const hasta = new Date(ahora.getTime() + dias * 86400000);
+    const TOPE_DEFAULT = new Date(ahora.getTime() + 365 * 86400000);
+    const fechasFin = recurResp.records
+      .map(r => r.fields["Fecha fin"])
+      .filter(Boolean)
+      .map(s => new Date(s + "T23:59:59-06:00").getTime());
+    const hasta = fechasFin.length
+      ? new Date(Math.max(TOPE_DEFAULT.getTime(), ...fechasFin))
+      : TOPE_DEFAULT;
     const existentesResp = await list(TABLES.ReservasAlpadel, {
       filterByFormula: `AND( IS_AFTER({Fecha y hora inicio}, '${ahora.toISOString()}'), IS_BEFORE({Fecha y hora inicio}, '${hasta.toISOString()}'), NOT({Reserva recurrente origen}='') )`.replace(/\s+/g, " "),
     });
@@ -534,10 +540,13 @@ router.post("/recurrentes/generar", requireAuth(OPERATIVO), async (req, res) => 
       if (diaNum == null) continue;
       if (!f.Cancha || !f["Hora inicio"] || !f["Hora fin"]) continue;
 
-      const fechaInicio = f["Fecha inicio"] ? new Date(f["Fecha inicio"] + "T00:00:00-06:00") : new Date(0);
-      const fechaFin = f["Fecha fin"] ? new Date(f["Fecha fin"] + "T23:59:59-06:00") : new Date("2099-12-31T00:00:00Z");
+      const fechaInicio = f["Fecha inicio"] ? new Date(f["Fecha inicio"] + "T00:00:00-06:00") : ahora;
+      // Si la recurrente no tiene Fecha fin, usar tope 1 año desde hoy
+      const fechaFin = f["Fecha fin"]
+        ? new Date(f["Fecha fin"] + "T23:59:59-06:00")
+        : new Date(ahora.getTime() + 365 * 86400000);
       const desde = new Date(Math.max(ahora.getTime(), fechaInicio.getTime()));
-      const limite = new Date(Math.min(hasta.getTime(), fechaFin.getTime()));
+      const limite = fechaFin;
 
       // Iterar día por día en la ventana
       let cursor = new Date(desde);
@@ -602,7 +611,6 @@ router.post("/recurrentes/generar", requireAuth(OPERATIVO), async (req, res) => 
 
     res.json({
       ok: true,
-      dias_ventana: dias,
       recurrentes_activas: recurResp.records.length,
       creadas,
       saltadas,
