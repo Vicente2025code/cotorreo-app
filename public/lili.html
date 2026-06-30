@@ -101,6 +101,34 @@
       <h3>🔁 Reservas recurrentes activas</h3>
       <button class="btn btn-primary btn-sm" onclick="abrirCrearRecurrente()" style="margin-bottom:12px;">+ Nueva recurrente</button>
       <div id="recurrentes-list" class="loading">Cargando</div>
+      <div id="recurrente-form" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+        <h4 style="margin-bottom:10px;">+ Nueva recurrente de maestro</h4>
+        <div class="form-group"><label>Maestro *</label><select id="recli-maestro" required><option value="">Cargando...</option></select></div>
+        <div class="form-group"><label>Día de la semana *</label><select id="recli-dia" required>
+          <option value="">Selecciona...</option>
+          <option value="Lunes">Lunes</option>
+          <option value="Martes">Martes</option>
+          <option value="Miércoles">Miércoles</option>
+          <option value="Jueves">Jueves</option>
+          <option value="Viernes">Viernes</option>
+          <option value="Sábado">Sábado</option>
+          <option value="Domingo">Domingo</option>
+        </select></div>
+        <div class="form-group"><label>Hora inicio *</label><select id="recli-hora-ini" required></select></div>
+        <div class="form-group"><label>Hora fin *</label><select id="recli-hora-fin" required></select></div>
+        <div class="form-group"><label>Cancha *</label><select id="recli-cancha" required>
+          <option value="Dobles">Cancha 1 — Dobles (grande)</option>
+          <option value="Singles">Cancha 2 — Singles (pequeña)</option>
+        </select></div>
+        <div class="form-group"><label>Desde *</label><input type="date" id="recli-desde" required></div>
+        <div class="form-group"><label>Hasta *</label><input type="date" id="recli-hasta" required></div>
+        <div class="form-group"><label>Notas</label><textarea id="recli-notas" placeholder="Alumno o grupo, equipo, etc."></textarea></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-block" onclick="guardarRecurrenteLili()">Guardar</button>
+          <button class="btn btn-sm" onclick="cerrarCrearRecurrente()">Cancelar</button>
+        </div>
+        <p class="hint" style="margin-top:10px;">Para crear una recurrente de cliente (no maestro), por ahora hazlo desde Airtable.</p>
+      </div>
     </div>
   </div>
 
@@ -787,8 +815,72 @@ async function loadRecurrentes() {
   }
 }
 
-function abrirCrearRecurrente() {
-  alert("Por simplicidad, crea recurrentes desde Airtable directo por ahora. Próximamente acá.");
+// Llenar selects de horas del form de recurrentes (una sola vez al cargar el módulo)
+(function poblarHorasRecli() {
+  const to12 = (h, m) => { const p = h >= 12 ? "PM" : "AM"; const h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h); return `${h12}:${m} ${p}`; };
+  ["recli-hora-ini", "recli-hora-fin"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    let html = '<option value="">Selecciona...</option>';
+    for (let i = 7; i <= 22; i++) {
+      html += `<option value="${String(i).padStart(2,"0")}:00">${to12(i,"00")}</option>`;
+      if (i < 22) html += `<option value="${String(i).padStart(2,"0")}:30">${to12(i,"30")}</option>`;
+    }
+    sel.innerHTML = html;
+  });
+})();
+
+async function abrirCrearRecurrente() {
+  document.getElementById("recurrente-form").style.display = "block";
+  // Cargar maestros activos
+  try {
+    const r = await api("GET", "/api/maestros");
+    const sel = document.getElementById("recli-maestro");
+    sel.innerHTML = '<option value="">Selecciona...</option>' + r.maestros.map(m => `<option value="${m.id}">${m.nombre}</option>`).join("");
+  } catch (e) {
+    document.getElementById("recli-maestro").innerHTML = '<option value="">Error: ' + e.message + '</option>';
+  }
+}
+
+function cerrarCrearRecurrente() {
+  document.getElementById("recurrente-form").style.display = "none";
+  ["recli-maestro","recli-dia","recli-hora-ini","recli-hora-fin","recli-desde","recli-hasta","recli-notas"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+}
+
+async function guardarRecurrenteLili() {
+  const maestroId = document.getElementById("recli-maestro").value;
+  const diaSemana = document.getElementById("recli-dia").value;
+  const horaInicio = document.getElementById("recli-hora-ini").value;
+  const horaFin = document.getElementById("recli-hora-fin").value;
+  const cancha = document.getElementById("recli-cancha").value;
+  const fechaInicio = document.getElementById("recli-desde").value;
+  const fechaFin = document.getElementById("recli-hasta").value;
+  const notas = document.getElementById("recli-notas").value.trim() || undefined;
+  if (!maestroId || !diaSemana || !horaInicio || !horaFin || !cancha || !fechaInicio || !fechaFin) {
+    alert("Faltan datos obligatorios.");
+    return;
+  }
+  if (horaFin <= horaInicio) {
+    alert("La hora fin debe ser posterior a la hora inicio.");
+    return;
+  }
+  // Referencia legible
+  const maestroNombre = document.getElementById("recli-maestro").selectedOptions[0].textContent;
+  const referencia = `Recurrente · ${maestroNombre} · ${diaSemana} ${horaInicio}–${horaFin}`;
+  try {
+    await api("POST", "/api/recurrentes", {
+      referencia, maestroId, tipo: "Maestro",
+      cancha, diaSemana, horaInicio, horaFin, fechaInicio, fechaFin,
+    });
+    alert("✅ Recurrente creada");
+    cerrarCrearRecurrente();
+    loadRecurrentes();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
 }
 
 // ===== CUMPLES =====
