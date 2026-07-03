@@ -6,7 +6,12 @@
 const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const TOKEN_TTL = "24h";
+// TTL por rol. Maestros y saloneros pueden dejar la sesión abierta 1 año
+// porque solo ven / editan lo suyo; para gerencia mantenemos 24h por seguridad
+// (más datos sensibles). El TTL aplica a la firma del JWT; el frontend guarda
+// el token en localStorage y lo reutiliza mientras esté vigente.
+const TOKEN_TTL_ADMIN = "24h";
+const TOKEN_TTL_LARGO = "365d";
 
 // Lee PINs desde variables de entorno con prefijo PIN_
 // Soporta tanto formato fijo (PIN_0001..0099) como aleatorio (PIN_290380)
@@ -81,10 +86,12 @@ function login(pin, ip) {
   }
 
   clearAttempts(ip);
+  const rolesLargos = new Set(["maestro", "saloneros"]);
+  const ttl = rolesLargos.has(user.rol) ? TOKEN_TTL_LARGO : TOKEN_TTL_ADMIN;
   const token = jwt.sign(
     { nombre: user.nombre, rol: user.rol, recordId: user.recordId },
     JWT_SECRET,
-    { expiresIn: TOKEN_TTL }
+    { expiresIn: ttl }
   );
 
   console.log(

@@ -470,6 +470,48 @@ async function doLogin(e) {
   return false;
 }
 
+// Auto-login por URL: si viene `?pin=XXXXXX` (magic link para maestros que
+// no manejan tecnología). Loguea, guarda sesión y redirige — el usuario nunca
+// ve la pantalla de PIN. Como la sesión de maestros dura 365 días, con abrir
+// el link 1 sola vez queda listo para siempre en ese navegador.
+(async function autoLoginByURL() {
+  const params = new URLSearchParams(window.location.search);
+  const urlPin = (params.get("pin") || "").replace(/[^0-9]/g, "");
+  if (!urlPin || urlPin.length < 4 || urlPin.length > 8) return;
+
+  // Ocultar el form y mostrar loading state
+  const formEl = document.querySelector("form");
+  if (formEl) formEl.style.display = "none";
+  showFeedback("info", "Entrando…");
+
+  try {
+    const r = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: urlPin }),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok || !json.ok) {
+      if (formEl) formEl.style.display = "";
+      showFeedback("error", "El link ya no es válido. Contactá a tu operador.");
+      return;
+    }
+    setSession(json.token, json.user);
+    const rolPath = {
+      gerencia: "/gerencia.html",
+      lili: "/lili.html",
+      maestro: "/maestro.html",
+      saloneros: "/restaurante.html",
+    };
+    // Limpiar el PIN de la URL antes de redirigir (no queda en historial)
+    window.history.replaceState({}, "", "/");
+    window.location.href = rolPath[json.user.rol] || "/";
+  } catch (e) {
+    if (formEl) formEl.style.display = "";
+    showFeedback("error", "Error de conexión.");
+  }
+})();
+
 document.getElementById("pinInput").focus();
 </script>
 
