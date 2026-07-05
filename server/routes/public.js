@@ -12,6 +12,32 @@ const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buil
 
 const router = express.Router();
 
+// Mutex en memoria por clave para evitar creación duplicada por race condition.
+// Render corre un solo proceso Node, así que este Map es global suficiente.
+// Aprende del bug del 4-jul: 9 POST /api/reservas/alpadel llegaron en < 1 seg,
+// los 9 pasaron findDuplicadoReciente y findAlpadelOverlap porque leían
+// Airtable ANTES de que ninguno hubiera escrito. Solución: serializar los
+// requests con la misma clave — el primero ejecuta el flujo, los demás
+// esperan y reciben el MISMO resultado.
+const _mutex = new Map(); // clave -> Promise en curso
+async function withMutex(clave, fn) {
+  if (_mutex.has(clave)) {
+    return await _mutex.get(clave);
+  }
+  const p = (async () => {
+    try {
+      return await fn();
+    } finally {
+      // Mantener la entrada 5 segundos post-resolución para que retries
+      // muy tardíos (llegan justo después de que el primer request terminó
+      // pero antes de que Airtable esté 100% consistente) vean el resultado.
+      setTimeout(() => _mutex.delete(clave), 5000);
+    }
+  })();
+  _mutex.set(clave, p);
+  return await p;
+}
+
 // ===========================
 // Rate limit en memoria (sin nuevas dependencias)
 // Protege endpoints sensibles contra enumeración / spam.
@@ -281,102 +307,90 @@ router.post("/reservas/alpadel", async (req, res) => {
 
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
-
-    // BLOQUEO ANTI-PASADO — no permitir reservas para horas que ya pasaron
-    // (caso Oscar: seleccionó 8 AM cuando ya eran las 4 PM del mismo día)
-    if (startCR.getTime() <= Date.now()) {
-      const fmtCR = new Intl.DateTimeFormat("es-CR", {
-        timeZone: "America/Costa_Rica",
-        weekday: "short", day: "numeric", month: "short",
-        hour: "2-digit", minute: "2-digit", hour12: true,
-      }).format(startCR);
-      return res.status(400).json({
-        error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.`,
-      });
-    }
-
-    // BLOQUEO ANTI-DUPLICADO — el 4-jul un cliente mando 9 POST idénticos
-    // en < 1 segundo (posiblemente por doble-click o retry de red).
-    // Si existe una reserva ACTIVA identica creada en los últimos 60s,
-    // devolvemos la existente en lugar de crear un duplicado.
     const telefonoNorm = normalizeTelefono(telefono);
-    const dup = await findDuplicadoReciente({
-      tabla: TABLES.ReservasAlpadel,
-      campoInicio: "Fecha y hora inicio",
-      fields: {
-        Cancha: cancha,
-        "Fecha y hora inicio": startCR.toISOString(),
-        "Telefono cliente": telefonoNorm,
-      },
-      ventanaSeg: 60,
-    });
-    if (dup) {
-      return res.json({
-        ok: true,
-        duplicado_detectado: true,
-        reserva: {
-          id: dup.id,
-          referencia: dup.fields.Referencia,
-          precio: dup.fields.Precio,
-        },
-      });
-    }
 
-    // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear
-    const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
-    if (conflicto) {
-      const fmtCR = (iso) => {
-        const d = new Date(iso);
-        return new Intl.DateTimeFormat("es-CR", {
+    // MUTEX POR CLAVE — la clave describe la reserva única. Requests
+    // concurrentes con la misma clave se serializan: el primero ejecuta todo
+    // el flujo y los demás reciben SU MISMO resultado. Sin duplicados aunque
+    // lleguen 9 POST en 1 milisegundo.
+    const claveMutex = `alpadel|${telefonoNorm}|${cancha}|${startCR.toISOString()}`;
+    const resultado = await withMutex(claveMutex, async () => {
+      // ANTI-PASADO
+      if (startCR.getTime() <= Date.now()) {
+        const fmtCR = new Intl.DateTimeFormat("es-CR", {
+          timeZone: "America/Costa_Rica",
+          weekday: "short", day: "numeric", month: "short",
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        }).format(startCR);
+        return { code: 400, body: { error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.` } };
+      }
+
+      // ANTI-DUPLICADO ventana 60s — atrapa retries que llegan tras terminar
+      // el primer request (fuera del mutex vivo).
+      const dup = await findDuplicadoReciente({
+        tabla: TABLES.ReservasAlpadel,
+        campoInicio: "Fecha y hora inicio",
+        fields: {
+          Cancha: cancha,
+          "Fecha y hora inicio": startCR.toISOString(),
+          "Telefono cliente": telefonoNorm,
+        },
+        ventanaSeg: 60,
+      });
+      if (dup) {
+        return { code: 200, body: {
+          ok: true, duplicado_detectado: true,
+          reserva: { id: dup.id, referencia: dup.fields.Referencia, precio: dup.fields.Precio },
+        }};
+      }
+
+      // ANTI-SOLAPAMIENTO
+      const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
+      if (conflicto) {
+        const fmtCR = (iso) => new Intl.DateTimeFormat("es-CR", {
           timeZone: "America/Costa_Rica",
           weekday: "short", day: "numeric", month: "short",
           hour: "2-digit", minute: "2-digit", hour12: false,
-        }).format(d);
-      };
-      return res.status(409).json({
-        error: `Esa cancha ya está reservada de ${fmtCR(conflicto.inicio)} a ${fmtCR(conflicto.fin)}. Elegí otro horario o la otra cancha.`,
-        conflicto,
+        }).format(new Date(iso));
+        return { code: 409, body: {
+          error: `Esa cancha ya está reservada de ${fmtCR(conflicto.inicio)} a ${fmtCR(conflicto.fin)}. Elegí otro horario o la otra cancha.`,
+          conflicto,
+        }};
+      }
+
+      const cliente = existing || await upsertCliente({
+        nombre, telefono, email, cumpleanos, cumpleanosDia, cumpleanosMes,
+        negocio: "Alpadel",
       });
-    }
 
-    const cliente = existing || await upsertCliente({
-      nombre,
-      telefono,
-      email,
-      cumpleanos,
-      cumpleanosDia,
-      cumpleanosMes,
-      negocio: "Alpadel",
+      const reserva = await create(
+        TABLES.ReservasAlpadel,
+        {
+          "Nombre cliente": nombre,
+          "Telefono cliente": telefonoNorm,
+          "Email cliente": email,
+          "Cumpleaños cliente": cumpleanos,
+          "Fecha y hora inicio": startCR.toISOString(),
+          "Hora fin": endCR.toISOString(),
+          Cancha: cancha,
+          Estado: "Confirmada",
+          "Tipo de reserva": "Regular",
+          Cliente: [cliente.id],
+          Notas: notas || undefined,
+          Referencia: `Alpadel · ${nombre} · ${startCR.toISOString()}`,
+        },
+        { typecast: true }
+      );
+      return { code: 200, body: {
+        ok: true,
+        reserva: {
+          id: reserva.id,
+          referencia: reserva.fields.Referencia,
+          precio: reserva.fields.Precio,
+        },
+      }};
     });
-
-    // Crear reserva
-    const reserva = await create(
-      TABLES.ReservasAlpadel,
-      {
-        "Nombre cliente": nombre,
-        "Telefono cliente": telefonoNorm,
-        "Email cliente": email,
-        "Cumpleaños cliente": cumpleanos,
-        "Fecha y hora inicio": startCR.toISOString(),
-        "Hora fin": endCR.toISOString(),
-        Cancha: cancha,
-        Estado: "Confirmada",
-        "Tipo de reserva": "Regular",
-        Cliente: [cliente.id],
-        Notas: notas || undefined,
-        Referencia: `Alpadel · ${nombre} · ${startCR.toISOString()}`,
-      },
-      { typecast: true }
-    );
-
-    res.json({
-      ok: true,
-      reserva: {
-        id: reserva.id,
-        referencia: reserva.fields.Referencia,
-        precio: reserva.fields.Precio,
-      },
-    });
+    return res.status(resultado.code).json(resultado.body);
   } catch (e) {
     console.error("POST reservas/alpadel", e);
     res.status(500).json({ error: e.message });
@@ -419,79 +433,67 @@ router.post("/reservas/cotorreo", async (req, res) => {
     if (faltan.length)
       return res.status(400).json({ error: `Faltan: ${faltan.join(", ")}` });
 
-    // BLOQUEO ANTI-PASADO — no permitir reservas de mesa para horas que ya pasaron
     const startMesa = parseFechaHoraCR(fechaHora);
-    if (startMesa && startMesa.getTime() <= Date.now()) {
-      const fmtCR = new Intl.DateTimeFormat("es-CR", {
-        timeZone: "America/Costa_Rica",
-        weekday: "short", day: "numeric", month: "short",
-        hour: "2-digit", minute: "2-digit", hour12: true,
-      }).format(startMesa);
-      return res.status(400).json({
-        error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.`,
-      });
-    }
-
-    // BLOQUEO ANTI-DUPLICADO — mesa Cotorreo (mismo bug del doble-POST)
     const telefonoNormMesa = normalizeTelefono(telefono);
-    const dupMesa = await findDuplicadoReciente({
-      tabla: TABLES.ReservasCotorreo,
-      campoInicio: "Fecha y hora",
-      fields: {
-        "Fecha y hora": startMesa.toISOString(),
-        "Telefono cliente": telefonoNormMesa,
-      },
-      ventanaSeg: 60,
-    });
-    if (dupMesa) {
-      return res.json({
-        ok: true,
-        duplicado_detectado: true,
-        reserva: {
-          id: dupMesa.id,
-          referencia: dupMesa.fields.Referencia,
+    const claveMutexMesa = `cotorreo|${telefonoNormMesa}|${startMesa ? startMesa.toISOString() : "no-start"}`;
+
+    const resultadoMesa = await withMutex(claveMutexMesa, async () => {
+      // ANTI-PASADO
+      if (startMesa && startMesa.getTime() <= Date.now()) {
+        const fmtCR = new Intl.DateTimeFormat("es-CR", {
+          timeZone: "America/Costa_Rica",
+          weekday: "short", day: "numeric", month: "short",
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        }).format(startMesa);
+        return { code: 400, body: { error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.` } };
+      }
+
+      // ANTI-DUPLICADO ventana 60s
+      const dupMesa = await findDuplicadoReciente({
+        tabla: TABLES.ReservasCotorreo,
+        campoInicio: "Fecha y hora",
+        fields: {
+          "Fecha y hora": startMesa.toISOString(),
+          "Telefono cliente": telefonoNormMesa,
         },
+        ventanaSeg: 60,
       });
-    }
+      if (dupMesa) {
+        return { code: 200, body: {
+          ok: true, duplicado_detectado: true,
+          reserva: { id: dupMesa.id, referencia: dupMesa.fields.Referencia },
+        }};
+      }
 
-    const cliente = existing || await upsertCliente({
-      nombre,
-      telefono,
-      email,
-      cumpleanos,
-      cumpleanosDia,
-      cumpleanosMes,
-      negocio: "Plaza Cotorreo",
+      const cliente = existing || await upsertCliente({
+        nombre, telefono, email, cumpleanos, cumpleanosDia, cumpleanosMes,
+        negocio: "Plaza Cotorreo",
+      });
+
+      const reserva = await create(
+        TABLES.ReservasCotorreo,
+        {
+          "Nombre cliente": nombre,
+          "Telefono cliente": telefonoNormMesa,
+          "Email cliente": email,
+          "Cumpleaños cliente": cumpleanos,
+          "Fecha y hora": startMesa.toISOString(),
+          Personas: Number(personas),
+          Ocasion: ocasion || "Ninguna",
+          Area: area || undefined,
+          Estado: "Confirmada",
+          Cliente: [cliente.id],
+          Notas: notas || undefined,
+          Referencia: `Cotorreo · ${nombre} · ${startMesa.toISOString()}`,
+        },
+        { typecast: true }
+      );
+      return { code: 200, body: {
+        ok: true,
+        reserva: { id: reserva.id, referencia: reserva.fields.Referencia },
+      }};
     });
-
-    const reserva = await create(
-      TABLES.ReservasCotorreo,
-      {
-        "Nombre cliente": nombre,
-        "Telefono cliente": normalizeTelefono(telefono),
-        "Email cliente": email,
-        "Cumpleaños cliente": cumpleanos,
-        // BUG FIX timezone: parseFechaHoraCR interpreta el input "YYYY-MM-DDTHH:MM" como hora CR (UTC-6).
-        // Antes `new Date(fechaHora)` lo interpretaba como UTC en Render → -6h al renderizar (7pm aparecía como 1pm).
-        "Fecha y hora": parseFechaHoraCR(fechaHora).toISOString(),
-        Personas: Number(personas),
-        Ocasion: ocasion || "Ninguna",
-        Area: area || undefined,
-        Estado: "Confirmada",
-        Cliente: [cliente.id],
-        Notas: notas || undefined,
-        Referencia: `Cotorreo · ${nombre} · ${parseFechaHoraCR(fechaHora).toISOString()}`,
-      },
-      { typecast: true }
-    );
-
-    res.json({
-      ok: true,
-      reserva: {
-        id: reserva.id,
-        referencia: reserva.fields.Referencia,
-      },
-    });
+    return res.status(resultadoMesa.code).json(resultadoMesa.body);
   } catch (e) {
     console.error("POST reservas/cotorreo", e);
     res.status(500).json({ error: e.message });
