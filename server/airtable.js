@@ -212,6 +212,48 @@ async function findAlpadelOverlap(cancha, startISO, endISO, { excludeId } = {}) 
   };
 }
 
+/**
+ * Anti-duplicado por ventana temporal.
+ *
+ * Caso real: el 4-jul llegaron 9 POST /reservas/alpadel en < 1 segundo con los
+ * mismos datos (mismo cliente, misma cancha, mismo horario). El anti-solapamiento
+ * no los detectó porque los 9 leyeron Airtable ANTES de que ninguno hubiera
+ * escrito — race condition clásico check-then-write sin lock.
+ *
+ * Este helper busca una reserva ACTIVA con match exacto de:
+ *   Tabla + Cancha + Fecha y hora inicio exacto + Telefono cliente
+ * creada en los últimos `ventanaSeg` segundos. Si existe, la devuelve para que
+ * el endpoint responda con la reserva original en lugar de crear duplicado.
+ */
+async function findDuplicadoReciente({ tabla, fields, campoInicio, ventanaSeg = 60 }) {
+  if (!tabla || !fields || !campoInicio) return null;
+  const startISO = fields[campoInicio];
+  const tel = (fields["Telefono cliente"] || "").trim();
+  const cancha = fields.Cancha;
+  if (!startISO || !tel) return null;
+
+  // La ventana temporal se resuelve en JS (filtro por createdTime post-fetch),
+  // porque en la formula de Airtable comparar contra NOW() con precisión de
+  // segundos es frágil.
+  const escTel = tel.replace(/'/g, "\\'");
+  const escInicio = String(startISO).replace(/'/g, "\\'");
+  const escCancha = cancha ? String(cancha).replace(/'/g, "\\'") : "";
+  const partes = [
+    `{${campoInicio}}='${escInicio}'`,
+    `{Telefono cliente}='${escTel}'`,
+    `OR({Estado}='Confirmada', {Estado}='Pendiente')`,
+  ];
+  if (cancha) partes.push(`{Cancha}='${escCancha}'`);
+  const formula = `AND(${partes.join(", ")})`;
+  const r = await list(tabla, { filterByFormula: formula, pageSize: 5 });
+  const cutoff = Date.now() - ventanaSeg * 1000;
+  const recientes = (r.records || []).filter((rec) => {
+    const t = rec.get ? null : Date.parse(rec.createdTime || "");
+    return isFinite(t) && t >= cutoff;
+  });
+  return recientes[0] || null;
+}
+
 module.exports = {
   TABLES,
   call,
@@ -225,4 +267,5 @@ module.exports = {
   normalizeTelefono,
   parseFechaHoraCR,
   findAlpadelOverlap,
+  findDuplicadoReciente,
 };

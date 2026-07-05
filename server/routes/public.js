@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
+const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente } = require("../airtable");
 
 const router = express.Router();
 
@@ -295,6 +295,33 @@ router.post("/reservas/alpadel", async (req, res) => {
       });
     }
 
+    // BLOQUEO ANTI-DUPLICADO — el 4-jul un cliente mando 9 POST idénticos
+    // en < 1 segundo (posiblemente por doble-click o retry de red).
+    // Si existe una reserva ACTIVA identica creada en los últimos 60s,
+    // devolvemos la existente en lugar de crear un duplicado.
+    const telefonoNorm = normalizeTelefono(telefono);
+    const dup = await findDuplicadoReciente({
+      tabla: TABLES.ReservasAlpadel,
+      campoInicio: "Fecha y hora inicio",
+      fields: {
+        Cancha: cancha,
+        "Fecha y hora inicio": startCR.toISOString(),
+        "Telefono cliente": telefonoNorm,
+      },
+      ventanaSeg: 60,
+    });
+    if (dup) {
+      return res.json({
+        ok: true,
+        duplicado_detectado: true,
+        reserva: {
+          id: dup.id,
+          referencia: dup.fields.Referencia,
+          precio: dup.fields.Precio,
+        },
+      });
+    }
+
     // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear
     const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
     if (conflicto) {
@@ -327,7 +354,7 @@ router.post("/reservas/alpadel", async (req, res) => {
       TABLES.ReservasAlpadel,
       {
         "Nombre cliente": nombre,
-        "Telefono cliente": normalizeTelefono(telefono),
+        "Telefono cliente": telefonoNorm,
         "Email cliente": email,
         "Cumpleaños cliente": cumpleanos,
         "Fecha y hora inicio": startCR.toISOString(),
@@ -402,6 +429,28 @@ router.post("/reservas/cotorreo", async (req, res) => {
       }).format(startMesa);
       return res.status(400).json({
         error: `Esa hora (${fmtCR}) ya pasó. Elegí una fecha y hora a futuro.`,
+      });
+    }
+
+    // BLOQUEO ANTI-DUPLICADO — mesa Cotorreo (mismo bug del doble-POST)
+    const telefonoNormMesa = normalizeTelefono(telefono);
+    const dupMesa = await findDuplicadoReciente({
+      tabla: TABLES.ReservasCotorreo,
+      campoInicio: "Fecha y hora",
+      fields: {
+        "Fecha y hora": startMesa.toISOString(),
+        "Telefono cliente": telefonoNormMesa,
+      },
+      ventanaSeg: 60,
+    });
+    if (dupMesa) {
+      return res.json({
+        ok: true,
+        duplicado_detectado: true,
+        reserva: {
+          id: dupMesa.id,
+          referencia: dupMesa.fields.Referencia,
+        },
       });
     }
 
