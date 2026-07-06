@@ -286,12 +286,15 @@ router.delete("/mi-recurrente/:id", requireAuth(["maestro"]), async (req, res) =
       return res.status(403).json({ error: "No puedes desactivar recurrentes de otros" });
     }
     const borrarFuturas = String(req.query.borrarFuturas || req.body?.borrarFuturas || "").toLowerCase() === "true";
-    await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
     let futurasBorradas = 0;
     if (borrarFuturas) {
-      futurasBorradas = await borrarReservasFuturasDeRecurrente(req.params.id);
+      futurasBorradas = await borrarReservasFuturasDeRecurrente(rec);
+      // Borrar físicamente la recurrente (limpieza total)
+      await require("../airtable").call("DELETE", `${TABLES.RecurrentesAlpadel}/${req.params.id}`);
+      return res.json({ ok: true, futuras_borradas: futurasBorradas, recurrente_borrada: true });
     }
-    res.json({ ok: true, futuras_borradas: futurasBorradas });
+    await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
+    res.json({ ok: true, futuras_borradas: 0, recurrente_borrada: false });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

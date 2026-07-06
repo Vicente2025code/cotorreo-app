@@ -487,15 +487,55 @@ router.get("/recurrentes", requireAuth(OPERATIVO), async (_req, res) => {
 });
 
 // Helper: borrar reservas FUTURAS (aún no ocurridas) vinculadas a una recurrente.
-// Usa el linked record 'Reserva recurrente origen' en Reservas Alpadel.
+// Busca por 2 vías porque el linked record se rompe cuando la recurrente se
+// borra físicamente:
+//   1) Reservas con {Reserva recurrente origen} apuntando al recurrenteId.
+//   2) Reservas HUÉRFANAS: mismo patrón (día, hora, cancha, maestro/cliente)
+//      que la recurrente, aunque ya no tengan el linked record.
 // Devuelve la cantidad borrada.
-async function borrarReservasFuturasDeRecurrente(recurrenteId) {
+async function borrarReservasFuturasDeRecurrente(recurrente) {
   const ahoraISO = new Date().toISOString();
-  const formula = `AND( IS_AFTER({Fecha y hora inicio}, '${ahoraISO}'), NOT({Reserva recurrente origen}='') )`;
-  const r = await list(TABLES.ReservasAlpadel, { filterByFormula: formula });
-  const propias = (r.records || []).filter((rec) => (rec.fields["Reserva recurrente origen"] || []).includes(recurrenteId));
+  const recurId = typeof recurrente === "string" ? recurrente : recurrente.id;
+  const f = typeof recurrente === "string" ? null : recurrente.fields;
+
+  // 1) Vía linked record
+  const formula1 = `AND( IS_AFTER({Fecha y hora inicio}, '${ahoraISO}'), NOT({Reserva recurrente origen}='') )`;
+  const r1 = await list(TABLES.ReservasAlpadel, { filterByFormula: formula1 });
+  const linked = (r1.records || []).filter((rec) => (rec.fields["Reserva recurrente origen"] || []).includes(recurId));
+
+  // 2) Vía patrón (huérfanas): reservas Tipo=Maestro con el mismo maestro/cancha
+  //    y misma hora. Solo si tenemos los fields de la recurrente.
+  let huerfanas = [];
+  if (f) {
+    const maestroId = (f.Maestro || [])[0];
+    const clienteId = (f.Cliente || [])[0];
+    const cancha = f.Cancha;
+    const horaInicio = f["Hora inicio"];
+    const tipo = f.Tipo || "Maestro";
+    if (cancha && horaInicio) {
+      const formula2 = `AND( IS_AFTER({Fecha y hora inicio}, '${ahoraISO}'), {Cancha}='${cancha}', {Tipo de reserva}='${tipo}' )`;
+      const r2 = await list(TABLES.ReservasAlpadel, { filterByFormula: formula2 });
+      const dejaId = new Set(linked.map((x) => x.id));
+      huerfanas = (r2.records || []).filter((rec) => {
+        if (dejaId.has(rec.id)) return false; // ya está en linked
+        // Filtrar por maestro/cliente igual a la recurrente
+        if (maestroId && !(rec.fields.Maestro || []).includes(maestroId)) return false;
+        if (clienteId && !(rec.fields.Cliente || []).includes(clienteId)) return false;
+        // Filtrar por hora exacta (HH:MM CR). La reserva guarda ISO UTC.
+        const iso = rec.fields["Fecha y hora inicio"] || "";
+        const d = new Date(iso);
+        // CR = UTC-6
+        const cr = new Date(d.getTime() - 6 * 3600 * 1000);
+        const hhCR = String(cr.getUTCHours()).padStart(2, "0");
+        const mmCR = String(cr.getUTCMinutes()).padStart(2, "0");
+        return `${hhCR}:${mmCR}` === horaInicio;
+      });
+    }
+  }
+
+  const todos = [...linked, ...huerfanas];
   let borradas = 0;
-  for (const rec of propias) {
+  for (const rec of todos) {
     try {
       await require("../airtable").call("DELETE", `${TABLES.ReservasAlpadel}/${rec.id}`);
       borradas++;
@@ -506,19 +546,24 @@ async function borrarReservasFuturasDeRecurrente(recurrenteId) {
   return borradas;
 }
 
-// DELETE /api/recurrentes/:id?borrarFuturas=true — desactivar (Activa=false).
-// Con ?borrarFuturas=true también elimina las reservas futuras aún no
-// ocurridas que provienen de esa recurrente (caso Juan Bao: al desactivar
-// una recurrente duplicada, sus 26 clases futuras quedaban huérfanas).
+// DELETE /api/recurrentes/:id?borrarFuturas=true
+// - Sin borrarFuturas (default): solo Activa=false (queda como registro histórico).
+// - Con borrarFuturas=true: borra reservas futuras (linked + huérfanas) y
+//   BORRA FÍSICAMENTE la recurrente, así el patrón desaparece limpio.
 router.delete("/recurrentes/:id", requireAuth(OPERATIVO), async (req, res) => {
   try {
     const borrarFuturas = String(req.query.borrarFuturas || req.body?.borrarFuturas || "").toLowerCase() === "true";
-    await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
     let futurasBorradas = 0;
     if (borrarFuturas) {
-      futurasBorradas = await borrarReservasFuturasDeRecurrente(req.params.id);
+      // Primero leer la recurrente para conocer patrón (maestro/cancha/hora)
+      const recur = await get(TABLES.RecurrentesAlpadel, req.params.id);
+      futurasBorradas = await borrarReservasFuturasDeRecurrente(recur);
+      // Luego borrar físicamente la recurrente
+      await require("../airtable").call("DELETE", `${TABLES.RecurrentesAlpadel}/${req.params.id}`);
+      return res.json({ ok: true, futuras_borradas: futurasBorradas, recurrente_borrada: true });
     }
-    res.json({ ok: true, futuras_borradas: futurasBorradas });
+    await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
+    res.json({ ok: true, futuras_borradas: 0, recurrente_borrada: false });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
