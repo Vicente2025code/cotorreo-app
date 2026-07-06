@@ -10,7 +10,8 @@
 const express = require("express");
 const { TABLES, list, create, update, get, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
-const { generarReservasParaRecurrente } = require("./lili");
+const { withMutex } = require("../mutex");
+const { generarReservasParaRecurrente, borrarReservasFuturasDeRecurrente } = require("./lili");
 
 const router = express.Router();
 
@@ -225,28 +226,50 @@ router.post("/mi-recurrente", requireAuth(["maestro"]), async (req, res) => {
     }
     const m = await get(TABLES.Maestros, req.user.recordId);
     const referencia = `Recurrente · ${m.fields.Nombre} · ${diaSemana} ${horaInicio}–${horaFin}`;
-    const fields = {
-      Referencia: referencia,
-      Cancha: cancha,
-      "Día semana": diaSemana,
-      "Hora inicio": horaInicio,
-      "Hora fin": horaFin,
-      "Fecha inicio": fechaInicio,
-      "Fecha fin": fechaFin,
-      Tipo: "Maestro",
-      Activa: true,
-      Maestro: [req.user.recordId],
-      Notas: notas || undefined,
-    };
-    const r = await create(TABLES.RecurrentesAlpadel, fields, { typecast: true });
-    // Auto-generar reservas inmediatamente — sin botón manual.
-    let gen = { creadas: 0, saltadas: 0 };
-    try {
-      gen = await generarReservasParaRecurrente(r);
-    } catch (e) {
-      console.error("auto-generar tras POST /mi-recurrente:", e.message);
-    }
-    res.json({ ok: true, id: r.id, referencia, reservas_generadas: gen.creadas, reservas_saltadas: gen.saltadas });
+
+    // MUTEX + ANTI-DUPLICADO: si el maestro ya tiene una recurrente ACTIVA con
+    // exactamente el mismo horario/cancha, devolver esa en lugar de crear
+    // duplicada (caso Juan Bao: 3 recurrentes idénticas por doble-click).
+    const claveDup = `mi-recurrente|${req.user.recordId}|${cancha}|${diaSemana}|${horaInicio}|${horaFin}`;
+    const resultado = await withMutex(claveDup, async () => {
+      const existentes = await list(TABLES.RecurrentesAlpadel, {
+        filterByFormula: `AND({Activa}=TRUE(), {Cancha}='${cancha}', {Día semana}='${diaSemana}', {Hora inicio}='${horaInicio}', {Hora fin}='${horaFin}')`,
+      });
+      const yaExiste = (existentes.records || []).find((rec) => (rec.fields.Maestro || []).includes(req.user.recordId));
+      if (yaExiste) {
+        return { code: 200, body: {
+          ok: true, duplicado_detectado: true,
+          id: yaExiste.id, referencia: yaExiste.fields.Referencia,
+          reservas_generadas: 0, reservas_saltadas: 0,
+        }};
+      }
+
+      const fields = {
+        Referencia: referencia,
+        Cancha: cancha,
+        "Día semana": diaSemana,
+        "Hora inicio": horaInicio,
+        "Hora fin": horaFin,
+        "Fecha inicio": fechaInicio,
+        "Fecha fin": fechaFin,
+        Tipo: "Maestro",
+        Activa: true,
+        Maestro: [req.user.recordId],
+        Notas: notas || undefined,
+      };
+      const r = await create(TABLES.RecurrentesAlpadel, fields, { typecast: true });
+      let gen = { creadas: 0, saltadas: 0 };
+      try {
+        gen = await generarReservasParaRecurrente(r);
+      } catch (e) {
+        console.error("auto-generar tras POST /mi-recurrente:", e.message);
+      }
+      return { code: 200, body: {
+        ok: true, id: r.id, referencia,
+        reservas_generadas: gen.creadas, reservas_saltadas: gen.saltadas,
+      }};
+    });
+    return res.status(resultado.code).json(resultado.body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -262,8 +285,13 @@ router.delete("/mi-recurrente/:id", requireAuth(["maestro"]), async (req, res) =
     if (!maestros.includes(req.user.recordId)) {
       return res.status(403).json({ error: "No puedes desactivar recurrentes de otros" });
     }
+    const borrarFuturas = String(req.query.borrarFuturas || req.body?.borrarFuturas || "").toLowerCase() === "true";
     await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
-    res.json({ ok: true });
+    let futurasBorradas = 0;
+    if (borrarFuturas) {
+      futurasBorradas = await borrarReservasFuturasDeRecurrente(req.params.id);
+    }
+    res.json({ ok: true, futuras_borradas: futurasBorradas });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

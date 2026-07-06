@@ -19,6 +19,7 @@
 const express = require("express");
 const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
+const { withMutex } = require("../mutex");
 const mantenimiento = require("../airtableMantenimiento");
 
 const router = express.Router();
@@ -485,11 +486,39 @@ router.get("/recurrentes", requireAuth(OPERATIVO), async (_req, res) => {
   }
 });
 
-// DELETE /api/recurrentes/:id — desactivar (Activa=false)
+// Helper: borrar reservas FUTURAS (aún no ocurridas) vinculadas a una recurrente.
+// Usa el linked record 'Reserva recurrente origen' en Reservas Alpadel.
+// Devuelve la cantidad borrada.
+async function borrarReservasFuturasDeRecurrente(recurrenteId) {
+  const ahoraISO = new Date().toISOString();
+  const formula = `AND( IS_AFTER({Fecha y hora inicio}, '${ahoraISO}'), NOT({Reserva recurrente origen}='') )`;
+  const r = await list(TABLES.ReservasAlpadel, { filterByFormula: formula });
+  const propias = (r.records || []).filter((rec) => (rec.fields["Reserva recurrente origen"] || []).includes(recurrenteId));
+  let borradas = 0;
+  for (const rec of propias) {
+    try {
+      await require("../airtable").call("DELETE", `${TABLES.ReservasAlpadel}/${rec.id}`);
+      borradas++;
+    } catch (e) {
+      console.error("borrar futura", rec.id, e.message);
+    }
+  }
+  return borradas;
+}
+
+// DELETE /api/recurrentes/:id?borrarFuturas=true — desactivar (Activa=false).
+// Con ?borrarFuturas=true también elimina las reservas futuras aún no
+// ocurridas que provienen de esa recurrente (caso Juan Bao: al desactivar
+// una recurrente duplicada, sus 26 clases futuras quedaban huérfanas).
 router.delete("/recurrentes/:id", requireAuth(OPERATIVO), async (req, res) => {
   try {
+    const borrarFuturas = String(req.query.borrarFuturas || req.body?.borrarFuturas || "").toLowerCase() === "true";
     await update(TABLES.RecurrentesAlpadel, req.params.id, { Activa: false });
-    res.json({ ok: true });
+    let futurasBorradas = 0;
+    if (borrarFuturas) {
+      futurasBorradas = await borrarReservasFuturasDeRecurrente(req.params.id);
+    }
+    res.json({ ok: true, futuras_borradas: futurasBorradas });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -655,32 +684,56 @@ router.post("/recurrentes", requireAuth(OPERATIVO), async (req, res) => {
       tipo,
     } = req.body;
 
-    const fields = {
-      Referencia: referencia,
-      Cancha: cancha,
-      "Día semana": diaSemana,
-      "Hora inicio": horaInicio,
-      "Hora fin": horaFin,
-      "Fecha inicio": fechaInicio,
-      "Fecha fin": fechaFin,
-      Tipo: tipo,
-      Activa: true,
-    };
-    if (clienteId) fields.Cliente = [clienteId];
-    if (maestroId) fields.Maestro = [maestroId];
+    // MUTEX + ANTI-DUPLICADO: si ya existe una recurrente activa con el
+    // mismo maestro/cliente + cancha + día + hora inicio + hora fin, devolver
+    // esa en lugar de crear una copia. Clave incluye maestroId/clienteId
+    // para que 2 maestros distintos puedan reservar el mismo horario.
+    const claveDup = `recurrente|${maestroId || ""}|${clienteId || ""}|${cancha}|${diaSemana}|${horaInicio}|${horaFin}`;
+    const resultado = await withMutex(claveDup, async () => {
+      // Anti-duplicado: buscar activa con match completo
+      const existentes = await list(TABLES.RecurrentesAlpadel, {
+        filterByFormula: `AND({Activa}=TRUE(), {Cancha}='${cancha}', {Día semana}='${diaSemana}', {Hora inicio}='${horaInicio}', {Hora fin}='${horaFin}')`,
+      });
+      const yaExiste = (existentes.records || []).find((rec) => {
+        const mIds = rec.fields.Maestro || [];
+        const cIds = rec.fields.Cliente || [];
+        return (maestroId && mIds.includes(maestroId)) || (clienteId && cIds.includes(clienteId));
+      });
+      if (yaExiste) {
+        return { code: 200, body: {
+          ok: true, duplicado_detectado: true,
+          recurrente: yaExiste, reservas_generadas: 0, reservas_saltadas: 0,
+        }};
+      }
 
-    const r = await create(TABLES.RecurrentesAlpadel, fields, {
-      typecast: true,
+      const fields = {
+        Referencia: referencia,
+        Cancha: cancha,
+        "Día semana": diaSemana,
+        "Hora inicio": horaInicio,
+        "Hora fin": horaFin,
+        "Fecha inicio": fechaInicio,
+        "Fecha fin": fechaFin,
+        Tipo: tipo,
+        Activa: true,
+      };
+      if (clienteId) fields.Cliente = [clienteId];
+      if (maestroId) fields.Maestro = [maestroId];
+
+      const r = await create(TABLES.RecurrentesAlpadel, fields, { typecast: true });
+      // Auto-generar reservas pendientes.
+      let gen = { creadas: 0, saltadas: 0 };
+      try {
+        gen = await generarReservasParaRecurrente(r);
+      } catch (e) {
+        console.error("auto-generar tras POST /recurrentes:", e.message);
+      }
+      return { code: 200, body: {
+        ok: true, recurrente: r,
+        reservas_generadas: gen.creadas, reservas_saltadas: gen.saltadas,
+      }};
     });
-    // Auto-generar las reservas pendientes de esta recurrente inmediatamente,
-    // así Lili NO tiene que apretar un botón "Generar" después.
-    let gen = { creadas: 0, saltadas: 0 };
-    try {
-      gen = await generarReservasParaRecurrente(r);
-    } catch (e) {
-      console.error("auto-generar tras POST /recurrentes:", e.message);
-    }
-    res.json({ ok: true, recurrente: r, reservas_generadas: gen.creadas, reservas_saltadas: gen.saltadas });
+    return res.status(resultado.code).json(resultado.body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1017,3 +1070,4 @@ router.get("/tickets/opciones", requireAuth(OPERATIVO), async (req, res) => {
 
 module.exports = router;
 module.exports.generarReservasParaRecurrente = generarReservasParaRecurrente;
+module.exports.borrarReservasFuturasDeRecurrente = borrarReservasFuturasDeRecurrente;

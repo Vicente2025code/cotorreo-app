@@ -857,9 +857,12 @@ function cerrarCrearRecurrente() {
 }
 
 async function desactivarRecurrenteLili(id) {
-  if (!confirm("¿Desactivar esta recurrente?\n\nLas reservas que ya están en el calendario se quedan; solo deja de generar futuras.")) return;
+  if (!confirm("¿Desactivar esta recurrente?\n\nDeja de generar futuras.")) return;
+  // Preguntar aparte si también borra las reservas futuras aún no realizadas.
+  const borrarFuturas = confirm("¿Borrar también las clases futuras que ya se generaron y aún no ocurrieron?\n\nSi le das ACEPTAR, se limpian del calendario.\nSi le das CANCELAR, se quedan (los alumnos siguen viendo esas clases).");
   try {
-    await api("DELETE", "/api/recurrentes/" + id);
+    const r = await api("DELETE", "/api/recurrentes/" + id + "?borrarFuturas=" + borrarFuturas);
+    if (r.futuras_borradas > 0) alert(`✅ Recurrente desactivada. ${r.futuras_borradas} clases futuras borradas del calendario.`);
     loadRecurrentes();
   } catch (e) {
     alert("Error: " + e.message);

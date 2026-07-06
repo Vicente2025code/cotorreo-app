@@ -264,9 +264,11 @@ async function crearRecurrente() {
 }
 
 async function desactivarRecurrente(id) {
-  if (!confirm("¿Desactivar esta recurrente? Las clases que ya están en el calendario se quedan; solo deja de generarse en el futuro.")) return;
+  if (!confirm("¿Desactivar esta recurrente?\n\nDeja de generar futuras.")) return;
+  const borrarFuturas = confirm("¿Borrar también las clases futuras que ya están en el calendario y aún no ocurrieron?\n\nACEPTAR: se limpian.\nCANCELAR: se quedan en el calendario.");
   try {
-    await api("DELETE", "/api/mi-recurrente/" + id);
+    const r = await api("DELETE", "/api/mi-recurrente/" + id + "?borrarFuturas=" + borrarFuturas);
+    if (r.futuras_borradas > 0) alert(`✅ Recurrente desactivada. ${r.futuras_borradas} clases futuras borradas.`);
     loadRecurrentes();
   } catch (e) {
     alert("Error: " + e.message);

@@ -9,34 +9,9 @@
 
 const express = require("express");
 const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente } = require("../airtable");
+const { withMutex } = require("../mutex");
 
 const router = express.Router();
-
-// Mutex en memoria por clave para evitar creación duplicada por race condition.
-// Render corre un solo proceso Node, así que este Map es global suficiente.
-// Aprende del bug del 4-jul: 9 POST /api/reservas/alpadel llegaron en < 1 seg,
-// los 9 pasaron findDuplicadoReciente y findAlpadelOverlap porque leían
-// Airtable ANTES de que ninguno hubiera escrito. Solución: serializar los
-// requests con la misma clave — el primero ejecuta el flujo, los demás
-// esperan y reciben el MISMO resultado.
-const _mutex = new Map(); // clave -> Promise en curso
-async function withMutex(clave, fn) {
-  if (_mutex.has(clave)) {
-    return await _mutex.get(clave);
-  }
-  const p = (async () => {
-    try {
-      return await fn();
-    } finally {
-      // Mantener la entrada 5 segundos post-resolución para que retries
-      // muy tardíos (llegan justo después de que el primer request terminó
-      // pero antes de que Airtable esté 100% consistente) vean el resultado.
-      setTimeout(() => _mutex.delete(clave), 5000);
-    }
-  })();
-  _mutex.set(clave, p);
-  return await p;
-}
 
 // ===========================
 // Rate limit en memoria (sin nuevas dependencias)
