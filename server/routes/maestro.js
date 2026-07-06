@@ -33,25 +33,41 @@ router.get("/mis-reservas", requireAuth(["maestro"]), async (req, res) => {
   try {
     const id = req.user.recordId;
     const ahora = new Date().toISOString();
-    // NOTA: filtramos por Tipo=Maestro en Airtable y por recordId del Maestro en JS.
-    // No usamos FIND/SEARCH sobre ARRAYJOIN({Maestro}) porque las fórmulas Airtable
-    // sobre linked records devuelven el PRIMARY FIELD (el nombre), no el recordId.
-    // Sin embargo en la respuesta JSON el campo Maestro SÍ viene como array de IDs.
-    const formula = `AND( {Tipo de reserva}='Maestro', OR({Estado}='Confirmada', {Estado}='Completada') )`;
+
+    // Traer:
+    //  1) Reservas Tipo=Maestro (clases que él imparte).
+    //  2) Reservas cualquier tipo cuyo Nombre cliente == nombre del maestro
+    //     (las que él reservó como cliente, aunque no fueran Tipo=Maestro).
+    // Filtramos por recordId / nombre en JS porque ARRAYJOIN({Maestro}) sobre
+    // linked records da el nombre (no el ID) y por consistencia con /mi-facturacion.
+    const maestroRec = await get(TABLES.Maestros, id);
+    const nombreMaestro = (maestroRec.fields.Nombre || "").trim();
+    const nombreSafe = nombreMaestro.replace(/'/g, "\\'");
+
+    const formula = `AND(
+      OR({Estado}='Confirmada', {Estado}='Completada'),
+      OR({Tipo de reserva}='Maestro', LOWER(TRIM({Nombre cliente}))=LOWER('${nombreSafe}'))
+    )`.replace(/\s+/g, " ");
 
     const r = await list(TABLES.ReservasAlpadel, {
       filterByFormula: formula,
       sort: [{ field: "Fecha y hora inicio", direction: "asc" }],
     });
 
+    const nombreLower = nombreMaestro.toLowerCase();
     const todas = r.records
-      .filter((rec) => Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id))
+      .filter((rec) => {
+        const tieneLink = Array.isArray(rec.fields.Maestro) && rec.fields.Maestro.includes(id);
+        const nombreMatch = (rec.fields["Nombre cliente"] || "").trim().toLowerCase() === nombreLower;
+        return tieneLink || nombreMatch;
+      })
       .map((rec) => ({
         id: rec.id,
         fechaHora: rec.fields["Fecha y hora inicio"],
         horaFin: rec.fields["Hora fin"],
         cancha: rec.fields["Cancha"],
         estado: rec.fields["Estado"],
+        tipo: rec.fields["Tipo de reserva"],
         notas: rec.fields["Notas"],
         duracion: rec.fields["Duracion horas"],
         precio: rec.fields["Precio"],
