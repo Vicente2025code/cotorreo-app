@@ -1,0 +1,16 @@
+{
+  "name": "Cotorreo Maestro",
+  "short_name": "Maestro",
+  "description": "Panel del maestro Alpadel",
+  "start_url": "/maestro.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#b87333",
+  "theme_color": "#b87333",
+  "icons": [
+    { "src": "/maestro-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/maestro-icon.png",     "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/maestro-icon.svg",     "sizes": "any",     "type": "image/svg+xml" }
+  ]
+}
