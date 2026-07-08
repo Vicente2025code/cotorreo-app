@@ -624,6 +624,18 @@ async function generarReservasParaRecurrente(recur, yaExisten = null) {
       if (yaExisten.has(key)) {
         saltadas++; cursor.setUTCDate(cursor.getUTCDate() + 1); continue;
       }
+      // Extra: si la cancha ya está ocupada en ese slot por CUALQUIER reserva
+      // activa (aunque no tenga origen recurrente), saltar. Esto cubre el caso
+      // Juan Bao 8-jul: creó manual 18:00 Singles ANTES del auto-generate — sin
+      // esto la recurrente clonaba el slot generando duplicado.
+      try {
+        const overlap = await findAlpadelOverlap(f.Cancha, startCR.toISOString(), endCR.toISOString());
+        if (overlap) {
+          saltadas++;
+          cursor.setUTCDate(cursor.getUTCDate() + 1);
+          continue;
+        }
+      } catch (_) { /* si el chequeo falla, seguimos — mejor duplicar que faltar */ }
 
       const fields = {
         "Fecha y hora inicio": startCR.toISOString(),

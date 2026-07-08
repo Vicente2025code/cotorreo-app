@@ -88,7 +88,6 @@ router.post("/mi-reserva", requireAuth(["maestro"]), async (req, res) => {
     if (!fecha || !hora || !duracion || !cancha)
       return res.status(400).json({ error: "Faltan datos" });
 
-    const m = await get(TABLES.Maestros, req.user.recordId);
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
 
@@ -104,36 +103,45 @@ router.post("/mi-reserva", requireAuth(["maestro"]), async (req, res) => {
       });
     }
 
-    // BLOQUEO ANTI-SOLAPAMIENTO — verifica que la cancha esté libre antes de crear
-    const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
-    if (conflicto) {
-      const fmt = (iso) => new Intl.DateTimeFormat("es-CR", {
-        timeZone: "America/Costa_Rica",
-        weekday: "short", day: "numeric", month: "short",
-        hour: "2-digit", minute: "2-digit", hour12: true,
-      }).format(new Date(iso));
-      return res.status(409).json({
-        error: `${cancha} ya está reservada de ${fmt(conflicto.inicio)} a ${fmt(conflicto.fin)} (${conflicto.nombre}). Elegí otro horario o la otra cancha.`,
-        conflicto,
-      });
-    }
+    // MUTEX por (maestro, cancha, startISO): serializa POSTs concurrentes del
+    // mismo slot para evitar la carrera check-then-write (caso Juan Bao 8-jul:
+    // creó dos veces la misma reserva 18:00 Singles y anti-solapamiento no
+    // detectó porque ambas leyeron Airtable antes de que ninguna escribiera).
+    const claveMutex = `mi-reserva|${req.user.recordId}|${cancha}|${startCR.toISOString()}`;
+    const resultado = await withMutex(claveMutex, async () => {
+      // Anti-solapamiento DENTRO del mutex → ya no hay race
+      const conflicto = await findAlpadelOverlap(cancha, startCR.toISOString(), endCR.toISOString());
+      if (conflicto) {
+        const fmt = (iso) => new Intl.DateTimeFormat("es-CR", {
+          timeZone: "America/Costa_Rica",
+          weekday: "short", day: "numeric", month: "short",
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        }).format(new Date(iso));
+        return { code: 409, body: {
+          error: `${cancha} ya está reservada de ${fmt(conflicto.inicio)} a ${fmt(conflicto.fin)} (${conflicto.nombre}). Elegí otro horario o la otra cancha.`,
+          conflicto,
+        }};
+      }
 
-    const r = await create(
-      TABLES.ReservasAlpadel,
-      {
-        "Fecha y hora inicio": startCR.toISOString(),
-        "Hora fin": endCR.toISOString(),
-        Cancha: cancha,
-        Estado: "Confirmada",
-        "Tipo de reserva": "Maestro",
-        Maestro: [req.user.recordId],
-        "Nombre cliente": m.fields.Nombre,
-        Notas: notas || undefined,
-        Referencia: `Alpadel · ${m.fields.Nombre} · ${startCR.toISOString()}`,
-      },
-      { typecast: true }
-    );
-    res.json({ ok: true, id: r.id });
+      const m = await get(TABLES.Maestros, req.user.recordId);
+      const r = await create(
+        TABLES.ReservasAlpadel,
+        {
+          "Fecha y hora inicio": startCR.toISOString(),
+          "Hora fin": endCR.toISOString(),
+          Cancha: cancha,
+          Estado: "Confirmada",
+          "Tipo de reserva": "Maestro",
+          Maestro: [req.user.recordId],
+          "Nombre cliente": m.fields.Nombre,
+          Notas: notas || undefined,
+          Referencia: `Alpadel · ${m.fields.Nombre} · ${startCR.toISOString()}`,
+        },
+        { typecast: true }
+      );
+      return { code: 200, body: { ok: true, id: r.id } };
+    });
+    return res.status(resultado.code).json(resultado.body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
