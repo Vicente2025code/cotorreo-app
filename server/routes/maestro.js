@@ -179,19 +179,38 @@ router.get("/mi-facturacion", requireAuth(["maestro"]), async (req, res) => {
     )`.replace(/\s+/g, " ");
 
     const r = await list(TABLES.ReservasAlpadel, { filterByFormula: formula });
+    const ahora = new Date();
     const reservas = r.records
       .filter((x) => Array.isArray(x.fields.Maestro) && x.fields.Maestro.includes(id))
-      .map((x) => ({
-        id: x.id,
-        fechaHora: x.fields["Fecha y hora inicio"],
-        cancha: x.fields["Cancha"],
-        duracion: x.fields["Duracion horas"],
-        precio: x.fields["Precio"],
-      }));
-    const totalHoras = reservas.reduce((s, x) => s + (x.duracion || 0), 0);
-    const totalAPagar = reservas.reduce((s, x) => s + (x.precio || 0), 0);
+      .map((x) => {
+        const fechaHora = x.fields["Fecha y hora inicio"];
+        return {
+          id: x.id,
+          fechaHora,
+          cancha: x.fields["Cancha"],
+          duracion: x.fields["Duracion horas"] || 0,
+          precio: x.fields["Precio"] || 0,
+          pasada: new Date(fechaHora) < ahora,
+        };
+      });
+    const pagado = reservas.filter((x) => x.pasada);
+    const porPagar = reservas.filter((x) => !x.pasada);
+    const agg = (arr) => ({
+      clases: arr.length,
+      horas: arr.reduce((s, x) => s + x.duracion, 0),
+      monto: arr.reduce((s, x) => s + x.precio, 0),
+    });
+    const pagadoAgg = agg(pagado);
+    const porPagarAgg = agg(porPagar);
 
-    res.json({ mes, reservas, totalHoras, totalAPagar });
+    res.json({
+      mes,
+      reservas,
+      pagado: pagadoAgg,
+      porPagar: porPagarAgg,
+      totalHoras: pagadoAgg.horas + porPagarAgg.horas,
+      totalAPagar: pagadoAgg.monto + porPagarAgg.monto,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

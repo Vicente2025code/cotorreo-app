@@ -197,16 +197,25 @@ async function loadFactura() {
   try {
     const mes = new Date().toISOString().slice(0, 7);
     const r = await api("GET", `/api/mi-facturacion?mes=${mes}`);
+    const p = r.pagado || { clases: 0, horas: 0, monto: 0 };
+    const pp = r.porPagar || { clases: 0, horas: 0, monto: 0 };
     document.getElementById("factura-info").innerHTML = `
-      <div class="kpi-grid">
-        <div class="kpi"><div class="label">Clases del mes</div><div class="value">${r.reservas.length}</div></div>
-        <div class="kpi"><div class="label">Horas</div><div class="value">${r.totalHoras}</div></div>
+      <div class="kpi" style="background:#e6f4ea; border-color:#c8e0d0;">
+        <div class="label" style="color:#2d8a47;">✅ Pagado (clases ya dadas)</div>
+        <div class="value" style="color:#2d8a47;">${fmtMonto(p.monto)}</div>
+        <div class="hint">${p.clases} clase${p.clases === 1 ? "" : "s"} · ${p.horas}h</div>
       </div>
-      <div class="kpi green" style="margin-top:10px;">
-        <div class="label">Total a pagar</div>
+      <div class="kpi" style="background:#fcf2e1; border-color:#f0d9a8; margin-top:10px;">
+        <div class="label" style="color:#b87333;">⏳ Por pagar (próximas del mes)</div>
+        <div class="value" style="color:#b87333;">${fmtMonto(pp.monto)}</div>
+        <div class="hint">${pp.clases} clase${pp.clases === 1 ? "" : "s"} · ${pp.horas}h</div>
+      </div>
+      <div class="kpi" style="margin-top:10px;">
+        <div class="label">Total del mes</div>
         <div class="value">${fmtMonto(r.totalAPagar)}</div>
+        <div class="hint">${r.reservas.length} clases · ${r.totalHoras}h</div>
       </div>
-      <p class="hint" style="margin-top:12px;">Estimado del mes. El cierre se hace el último día.</p>
+      <p class="hint" style="margin-top:12px;">Cierre el último día del mes. "Pagado" son clases ya dadas, "Por pagar" son las que faltan.</p>
     `;
   } catch (e) {
     document.getElementById("factura-info").innerHTML = "Error: " + e.message;
