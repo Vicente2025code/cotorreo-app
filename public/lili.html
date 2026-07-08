@@ -81,7 +81,7 @@
         <option value="Plaza Cotorreo">Plaza Cotorreo</option>
         <option value="Alpadel">Alpadel</option>
       </select></div>
-      <button class="btn btn-primary btn-block" onclick="crearCliente()">Registrar cliente</button>
+      <button class="btn btn-primary btn-block" onclick="guardOnce(this, () => crearCliente())">Registrar cliente</button>
       <div id="cli-feedback" style="margin-top:12px;"></div>
     </div>
   </div>
@@ -124,7 +124,7 @@
         <div class="form-group"><label>Hasta *</label><input type="date" id="recli-hasta" required></div>
         <div class="form-group"><label>Notas</label><textarea id="recli-notas" placeholder="Alumno o grupo, equipo, etc."></textarea></div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary btn-block" onclick="guardarRecurrenteLili()">Guardar</button>
+          <button class="btn btn-primary btn-block" onclick="guardOnce(this, () => guardarRecurrenteLili())">Guardar</button>
           <button class="btn btn-sm" onclick="cerrarCrearRecurrente()">Cancelar</button>
         </div>
         <p class="hint" style="margin-top:10px;">Para crear una recurrente de cliente (no maestro), por ahora hazlo desde Airtable.</p>

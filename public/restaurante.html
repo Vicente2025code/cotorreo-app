@@ -61,7 +61,7 @@
         <option>Balcón por pool</option><option>Sillas moradas</option>
       </select></div>
       <div class="form-group"><label>Notas</label><textarea id="m-notas"></textarea></div>
-      <button class="btn btn-primary btn-block" onclick="crearMesa()">Crear reserva</button>
+      <button class="btn btn-primary btn-block" onclick="guardOnce(this, () => crearMesa())">Crear reserva</button>
     </div>
   </div>
 
@@ -80,7 +80,7 @@
         <option value="Singles">Cancha 2 — Singles</option>
       </select></div>
       <div class="form-group"><label>Notas</label><textarea id="c-notas"></textarea></div>
-      <button class="btn btn-primary btn-block" onclick="crearCancha()">Crear reserva</button>
+      <button class="btn btn-primary btn-block" onclick="guardOnce(this, () => crearCancha())">Crear reserva</button>
     </div>
   </div>
 
@@ -107,7 +107,7 @@
         <option value="Plaza Cotorreo">Plaza Cotorreo</option>
         <option value="Alpadel">Alpadel</option>
       </select></div>
-      <button class="btn btn-primary btn-block" onclick="crearCliente()">Registrar cliente</button>
+      <button class="btn btn-primary btn-block" onclick="guardOnce(this, () => crearCliente())">Registrar cliente</button>
       <div id="cli-feedback" style="margin-top:12px;"></div>
     </div>
   </div>

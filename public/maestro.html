@@ -67,7 +67,7 @@
         <option value="Singles">Cancha 2 — Singles</option>
       </select></div>
       <div class="form-group"><label>Notas (opcional)</label><textarea id="n-notas"></textarea></div>
-      <button class="btn btn-primary btn-block" onclick="crearReserva()">Crear reserva</button>
+      <button class="btn btn-primary btn-block" onclick="crearReserva(this)">Crear reserva</button>
     </div>
   </div>
 
@@ -97,7 +97,7 @@
       <div class="form-group"><label>Desde</label><input type="date" id="rec-desde" required></div>
       <div class="form-group"><label>Hasta</label><input type="date" id="rec-hasta" required></div>
       <div class="form-group"><label>Notas (opcional)</label><textarea id="rec-notas" placeholder="Alumno o grupo, equipo, etc."></textarea></div>
-      <button class="btn btn-primary btn-block" onclick="crearRecurrente()">Crear recurrente</button>
+      <button class="btn btn-primary btn-block" onclick="crearRecurrente(this)">Crear recurrente</button>
     </div>
   </div>
 
@@ -174,7 +174,7 @@ async function cancelar(id) {
   }
 }
 
-async function crearReserva() {
+async function crearReserva(btn) {
   const data = {
     fecha: document.getElementById("n-fecha").value,
     hora: document.getElementById("n-hora").value,
@@ -183,6 +183,10 @@ async function crearReserva() {
     notas: document.getElementById("n-notas").value,
   };
   if (!data.fecha || !data.hora || !data.cancha) return alert("Faltan datos");
+  // Deshabilitar el botón mientras corre el request — evita que un doble click
+  // dispare 2 POSTs. El backend también tiene mutex por si acaso.
+  const textoOriginal = btn && btn.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
   try {
     await api("POST", "/api/mi-reserva", data);
     alert("✅ Reserva creada");
@@ -190,6 +194,8 @@ async function crearReserva() {
     loadProximas();
   } catch (e) {
     alert("Error: " + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
   }
 }
 
@@ -259,7 +265,7 @@ async function loadRecurrentes() {
   }
 }
 
-async function crearRecurrente() {
+async function crearRecurrente(btn) {
   const body = {
     diaSemana: document.getElementById("rec-dia").value,
     horaInicio: document.getElementById("rec-hora-ini").value,
@@ -277,6 +283,8 @@ async function crearRecurrente() {
     alert("La hora fin debe ser posterior a la hora inicio.");
     return;
   }
+  const textoOriginal = btn && btn.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
   try {
     const resp = await api("POST", "/api/mi-recurrente", body);
     const n = resp.reservas_generadas || 0;
@@ -290,6 +298,8 @@ async function crearRecurrente() {
     loadRecurrentes();
   } catch (e) {
     alert("Error: " + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
   }
 }
 

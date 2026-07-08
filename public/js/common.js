@@ -23,6 +23,24 @@ function logout() {
   window.location.href = "/";
 }
 
+// ===== Guard anti-doble-click =====
+// Envuelve un handler async y bloquea el botón mientras corre. Sirve para
+// evitar que un doble click dispare 2 POSTs (caso Juan Bao 8-jul: apretó dos
+// veces 'Crear reserva' y quedó duplicado). Uso desde el onclick:
+//   <button onclick="guardOnce(this, () => crearAlgo())">Crear</button>
+async function guardOnce(btn, fn, busyLabel = "Guardando...") {
+  if (!btn || btn.disabled) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    return await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
 // ===== Fetch wrapper con auth =====
 async function api(method, path, body) {
   const headers = { "Content-Type": "application/json" };
