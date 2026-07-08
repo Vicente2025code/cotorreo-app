@@ -476,6 +476,18 @@ async function doLogin(e) {
 // quitó el query, y le volvía a pedir PIN aunque ya se había logueado.
 (function autoRedirectIfLoggedIn() {
   try {
+    const params = new URLSearchParams(window.location.search);
+    // ?pin=XXXX en la URL siempre manda: ignorar sesión previa y dejar que
+    // autoLoginByURL() procese el nuevo PIN (útil cuando alguien más entró
+    // en esta computadora y ahora otro usuario quiere abrir su dashboard).
+    if (params.has("pin")) return;
+    // ?logout=1 → limpiar la sesión guardada y mostrar el form de PIN.
+    if (params.has("logout")) {
+      localStorage.removeItem("cotorreo_token");
+      localStorage.removeItem("cotorreo_user");
+      window.history.replaceState({}, "", "/login.html");
+      return;
+    }
     const token = localStorage.getItem("cotorreo_token");
     const userStr = localStorage.getItem("cotorreo_user");
     if (!token || !userStr) return;
@@ -503,6 +515,11 @@ async function doLogin(e) {
   const params = new URLSearchParams(window.location.search);
   const urlPin = (params.get("pin") || "").replace(/[^0-9]/g, "");
   if (!urlPin || urlPin.length < 4 || urlPin.length > 8) return;
+
+  // Limpiar sesión previa: si en esta computadora había otro usuario logueado,
+  // el ?pin=XXX manda y sobrescribe.
+  localStorage.removeItem("cotorreo_token");
+  localStorage.removeItem("cotorreo_user");
 
   // Ocultar el form y mostrar loading state
   const formEl = document.querySelector("form");
