@@ -470,6 +470,31 @@ async function doLogin(e) {
   return false;
 }
 
+// Auto-redirigir si YA hay sesión válida en localStorage — así el shortcut
+// de escritorio o home-screen (que puede haber perdido el ?pin=) no vuelve
+// a pedir PIN. Caso Juan Bao: arrastró el link al escritorio, el navegador
+// quitó el query, y le volvía a pedir PIN aunque ya se había logueado.
+(function autoRedirectIfLoggedIn() {
+  try {
+    const token = localStorage.getItem("cotorreo_token");
+    const userStr = localStorage.getItem("cotorreo_user");
+    if (!token || !userStr) return;
+    // Validar que el JWT no esté expirado
+    const parts = token.split(".");
+    if (parts.length !== 3) return;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (payload.exp && payload.exp * 1000 <= Date.now()) return; // expirado
+    const user = JSON.parse(userStr);
+    const rolPath = {
+      gerencia: "/gerencia.html",
+      lili: "/lili.html",
+      maestro: "/maestro.html",
+      saloneros: "/restaurante.html",
+    };
+    window.location.replace(rolPath[user.rol] || "/");
+  } catch (_) { /* si algo falla, dejar caer al form manual */ }
+})();
+
 // Auto-login por URL: si viene `?pin=XXXXXX` (magic link para maestros que
 // no manejan tecnología). Loguea, guarda sesión y redirige — el usuario nunca
 // ve la pantalla de PIN. Como la sesión de maestros dura 365 días, con abrir
