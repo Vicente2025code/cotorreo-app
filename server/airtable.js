@@ -52,14 +52,35 @@ async function list(tableId, opts = {}) {
   if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
   if (opts.maxRecords) params.set("maxRecords", opts.maxRecords);
   if (opts.view) params.set("view", opts.view);
+  if (opts.pageSize) params.set("pageSize", opts.pageSize);
   if (opts.sort) {
     opts.sort.forEach((s, i) => {
       params.set(`sort[${i}][field]`, s.field);
       params.set(`sort[${i}][direction]`, s.direction || "asc");
     });
   }
-  const qs = params.toString();
-  return call("GET", `${tableId}${qs ? "?" + qs : ""}`);
+  // Paginar hasta agotar (o hasta llegar a maxRecords si viene definido).
+  // Airtable devuelve max 100 por página; sin esto las consultas con >100
+  // resultados perdían los últimos records (bug Juan Bao 16-jul: sus 26
+  // reservas futuras quedaban cortadas por venir después de 67 pasadas).
+  const acumulado = [];
+  let offset = undefined;
+  const maxRec = opts.maxRecords ? Number(opts.maxRecords) : Infinity;
+  let guard = 0;
+  do {
+    if (offset) params.set("offset", offset); else params.delete("offset");
+    const qs = params.toString();
+    const page = await call("GET", `${tableId}${qs ? "?" + qs : ""}`);
+    const recs = page.records || [];
+    for (const r of recs) {
+      if (acumulado.length >= maxRec) break;
+      acumulado.push(r);
+    }
+    offset = page.offset;
+    guard++;
+    if (guard > 50) break; // safety net: max 5000 records por consulta
+  } while (offset && acumulado.length < maxRec);
+  return { records: acumulado };
 }
 
 async function get(tableId, recordId) {
