@@ -42,6 +42,18 @@ app.use("/api", require("./routes/gerencia"));
 // Acá solo montamos el router de las rutas.
 app.use("/api", require("./routes/tickets"));
 
+// ===== Config pública =====
+// Bandera para bloquear reservas Cotorreo desde el frontend cliente.
+// Se controla con env vars — no requiere deploy:
+//   COTORREO_BLOQUEADO=true|false
+//   COTORREO_MENSAJE_BLOQUEO="texto que ve el cliente al elegir Cotorreo"
+app.get("/api/config", (_req, res) => {
+  res.json({
+    cotorreoBloqueado: String(process.env.COTORREO_BLOQUEADO || "").toLowerCase() === "true",
+    cotorreoMensaje: process.env.COTORREO_MENSAJE_BLOQUEO || "",
+  });
+});
+
 // ===== Health =====
 app.get("/api/health", (_req, res) => {
   res.json({

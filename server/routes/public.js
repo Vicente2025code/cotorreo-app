@@ -378,6 +378,14 @@ router.post("/reservas/alpadel", async (req, res) => {
 // ===========================
 router.post("/reservas/cotorreo", async (req, res) => {
   try {
+    // Blindaje anti-bypass: si COTORREO_BLOQUEADO está prendido, ni siquiera
+    // aceptar POST desde clientes públicos (aunque intenten saltar el UI).
+    // Lili y Salonero usan /reservas/cotorreo/manual — ese sigue habilitado.
+    if (String(process.env.COTORREO_BLOQUEADO || "").toLowerCase() === "true") {
+      return res.status(503).json({
+        error: process.env.COTORREO_MENSAJE_BLOQUEO || "Reservas de Plaza Cotorreo temporalmente cerradas.",
+      });
+    }
     const {
       nombre,
       telefono,

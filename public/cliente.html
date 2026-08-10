@@ -890,6 +890,23 @@
   </div>
 
   <!-- ============================================
+       STEP 3B — COTORREO BLOQUEADO (día especial)
+       Se muestra cuando el backend responde cotorreoBloqueado=true.
+       ============================================ -->
+  <div class="step step-cotorreo-bloqueado" data-step-name="cotorreo-bloqueado">
+    <main class="main" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 20px; text-align:center;">
+      <div style="font-size:64px; line-height:1; margin-bottom:16px;">🍽️</div>
+      <h2 style="font-size:22px; font-weight:700; color:var(--text-primary); margin-bottom:12px;">Hoy no tomamos reservas</h2>
+      <p id="cotorreoBloqueadoMsg" style="font-size:16px; color:var(--text-secondary); line-height:1.5; max-width:400px; margin-bottom:24px;">
+        Este día en Plaza Cotorreo atendemos por orden de llegada. ¡Te esperamos!
+      </p>
+      <button type="button" class="btn-primary" style="max-width:280px;" onclick="showStep('select')">
+        Volver al inicio
+      </button>
+    </main>
+  </div>
+
+  <!-- ============================================
        STEP 3B — FORM PLAZA COTORREO
        ============================================ -->
   <div class="step step-cotorreo" data-step-name="cotorreo">
@@ -1164,10 +1181,28 @@ function goBack() {
 // STEP 1 → 2: selección de unidad
 // ============================================
 function selectTipo(tipo) {
+  // Chequeo de bloqueo Cotorreo — si el backend nos avisó que están cerradas
+  // las reservas de mesas (env var COTORREO_BLOQUEADO=true), mostramos el
+  // step con el mensaje customizable y NO dejamos pasar al form.
+  if (tipo === "cotorreo" && appConfig && appConfig.cotorreoBloqueado) {
+    const msgEl = document.getElementById("cotorreoBloqueadoMsg");
+    if (msgEl && appConfig.cotorreoMensaje) msgEl.textContent = appConfig.cotorreoMensaje;
+    showStep("cotorreo-bloqueado");
+    return;
+  }
   state.tipo = tipo;
   showStep("telefono");
   setTimeout(() => document.getElementById("telCheck").focus(), 100);
 }
+
+// Config del server — se carga al arrancar para saber si Cotorreo está bloqueado.
+let appConfig = { cotorreoBloqueado: false, cotorreoMensaje: "" };
+(async function cargarConfig() {
+  try {
+    const r = await fetch("/api/config");
+    if (r.ok) appConfig = await r.json();
+  } catch (_) { /* si falla el fetch, dejamos la app funcionar normal */ }
+})();
 
 // ============================================
 // STEP 2: validación de teléfono
