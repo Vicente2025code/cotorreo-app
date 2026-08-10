@@ -378,14 +378,6 @@ router.post("/reservas/alpadel", async (req, res) => {
 // ===========================
 router.post("/reservas/cotorreo", async (req, res) => {
   try {
-    // Blindaje anti-bypass: si COTORREO_BLOQUEADO está prendido, ni siquiera
-    // aceptar POST desde clientes públicos (aunque intenten saltar el UI).
-    // Lili y Salonero usan /reservas/cotorreo/manual — ese sigue habilitado.
-    if (String(process.env.COTORREO_BLOQUEADO || "").toLowerCase() === "true") {
-      return res.status(503).json({
-        error: process.env.COTORREO_MENSAJE_BLOQUEO || "Reservas de Plaza Cotorreo temporalmente cerradas.",
-      });
-    }
     const {
       nombre,
       telefono,
@@ -399,6 +391,23 @@ router.post("/reservas/cotorreo", async (req, res) => {
       area,
       notas,
     } = req.body;
+
+    // Blindaje anti-bypass: si la fecha solicitada cae en un día bloqueado
+    // (env var COTORREO_FECHAS_BLOQUEADAS), rechazar 503 aunque intenten
+    // saltar el UI. Lili/Salonero usan /reservas/cotorreo/manual — ese
+    // endpoint no aplica este bloqueo.
+    const fechasBloqRaw = process.env.COTORREO_FECHAS_BLOQUEADAS || "";
+    const fechasBloqueadas = fechasBloqRaw.split(",").map(s => s.trim()).filter(Boolean);
+    if (fechaHora && fechasBloqueadas.length > 0) {
+      // Extraer YYYY-MM-DD en zona CR. fechaHora puede venir como "2026-08-15T19:00"
+      // (local sin TZ del datetime-local input) → tomamos los primeros 10 chars.
+      const fechaCR = String(fechaHora).slice(0, 10);
+      if (fechasBloqueadas.includes(fechaCR)) {
+        return res.status(503).json({
+          error: process.env.COTORREO_MENSAJE_BLOQUEO || `Ese día (${fechaCR}) no aceptamos reservas online. Podés llegar directo — atendemos por orden de llegada.`,
+        });
+      }
+    }
 
     const faltan = [];
     if (!nombre) faltan.push("nombre");

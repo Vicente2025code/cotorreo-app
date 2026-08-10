@@ -43,13 +43,16 @@ app.use("/api", require("./routes/gerencia"));
 app.use("/api", require("./routes/tickets"));
 
 // ===== Config pública =====
-// Bandera para bloquear reservas Cotorreo desde el frontend cliente.
-// Se controla con env vars — no requiere deploy:
-//   COTORREO_BLOQUEADO=true|false
-//   COTORREO_MENSAJE_BLOQUEO="texto que ve el cliente al elegir Cotorreo"
+// Fechas específicas donde NO se aceptan reservas de mesas Cotorreo (día de
+// alto no-show: Día de la Madre, San Valentín, 25-dic, etc). Los demás días
+// funcionan normal. Env vars — no requieren deploy:
+//   COTORREO_FECHAS_BLOQUEADAS="2026-08-15,2026-12-25"  (YYYY-MM-DD en CR, separadas por coma)
+//   COTORREO_MENSAJE_BLOQUEO="texto que ve el cliente si elige una fecha bloqueada"
 app.get("/api/config", (_req, res) => {
+  const raw = process.env.COTORREO_FECHAS_BLOQUEADAS || "";
+  const fechas = raw.split(",").map(s => s.trim()).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
   res.json({
-    cotorreoBloqueado: String(process.env.COTORREO_BLOQUEADO || "").toLowerCase() === "true",
+    cotorreoFechasBloqueadas: fechas,
     cotorreoMensaje: process.env.COTORREO_MENSAJE_BLOQUEO || "",
   });
 });
