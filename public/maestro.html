@@ -111,10 +111,17 @@
 
 <script src="/js/common.js"></script>
 <script>
-if (!requireRole(["maestro"])) throw new Error("Sin permiso");
+// requireRole ya avisa y redirige al login. Antes acá había un `throw` suelto:
+// mataba el script entero, la página quedaba congelada en "Cargando" y el
+// maestro veía una pantalla en blanco sin entender que tenía que reingresar.
+const ACCESO_OK = requireRole(["maestro"]);
+if (!ACCESO_OK) {
+  const cont = document.getElementById("proximas-list");
+  if (cont) cont.textContent = "Tu acceso venció. Te llevamos a la pantalla de ingreso…";
+}
 
-const user = getUser();
-document.getElementById("userName").textContent = user.nombre;
+const user = getUser() || {};
+document.getElementById("userName").textContent = user.nombre || "Maestro";
 
 // Tabs
 document.querySelectorAll(".tab").forEach(btn => {
@@ -315,7 +322,7 @@ async function desactivarRecurrente(id) {
   }
 }
 
-loadProximas();
+if (ACCESO_OK) loadProximas();
 </script>
 </body>
 </html>
