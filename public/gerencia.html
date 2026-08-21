@@ -24,6 +24,7 @@
     <a class="tab" href="/calendario.html" style="text-decoration: none;">📅 Calendario</a>
     <button class="tab" data-tab="top">Top clientes</button>
     <button class="tab" data-tab="noshows">No-shows</button>
+    <button class="tab" data-tab="maestros">🎾 Maestros</button>
     <button class="tab" data-tab="operacion">Modo operativo</button>
   </div>
 
@@ -54,6 +55,14 @@
     <div class="card"><h3>👻 No-shows del mes</h3><div id="noshows-list" class="loading">Cargando</div></div>
   </div>
 
+  <div class="tab-content" id="tab-maestros">
+    <div class="card">
+      <h3>🎾 Facturación de maestros por mes</h3>
+      <p class="subtitle" style="margin:4px 0 12px;">Privado: cada maestro solo ve lo suyo en su propio panel.</p>
+      <div id="maestros-list" class="loading">Cargando</div>
+    </div>
+  </div>
+
   <div class="tab-content" id="tab-operacion">
     <div class="card">
       <h3>Modo operativo</h3>
@@ -78,6 +87,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "top") loadTop();
     if (btn.dataset.tab === "noshows") loadNoshows();
+    if (btn.dataset.tab === "maestros") loadMaestros();
   });
 });
 
@@ -148,6 +158,67 @@ async function loadNoshows() {
     `;
   } catch (e) {
     document.getElementById("noshows-list").innerHTML = "Error: " + e.message;
+  }
+}
+
+async function loadMaestros() {
+  const cont = document.getElementById("maestros-list");
+  try {
+    const r = await api("GET", "/api/dashboard/maestros-facturacion?meses=12");
+    if (!r.meses.length) {
+      cont.innerHTML = "<em>Todavía no hay clases de maestros registradas.</em>";
+      return;
+    }
+    const MES_NOMBRE = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const etiqueta = (m) => {
+      const [y, mm] = m.split("-").map(Number);
+      return MES_NOMBRE[mm] + " " + y;
+    };
+    // Solo las columnas de maestros que facturaron algo en el rango mostrado,
+    // para no arrastrar columnas vacías de gente que ya no da clases.
+    const activos = r.maestros.filter((m) =>
+      r.meses.some((f) => f.maestros.some((x) => x.id === m.id && x.monto > 0))
+    );
+
+    const cerrados = r.meses.filter((f) => !f.futuro && !f.enCurso);
+    const enCurso = r.meses.find((f) => f.enCurso);
+    const futuros = r.meses.filter((f) => f.futuro);
+
+    const fila = (f) => {
+      const celdas = activos
+        .map((m) => {
+          const v = f.maestros.find((x) => x.id === m.id);
+          return v && v.monto
+            ? `<td style="text-align:right;">${fmtMonto(v.monto)}<br><small style="opacity:.6">${v.clases} clases</small></td>`
+            : `<td style="text-align:right;opacity:.35;">—</td>`;
+        })
+        .join("");
+      return `<tr><td><strong>${etiqueta(f.mes)}</strong></td>${celdas}<td style="text-align:right;"><strong>${fmtMonto(f.total)}</strong></td></tr>`;
+    };
+
+    const tabla = (filas, titulo, nota) => {
+      if (!filas.length) return "";
+      return `
+        <h4 style="margin:16px 0 6px;">${titulo}</h4>
+        ${nota ? `<p class="subtitle" style="margin:0 0 8px;">${nota}</p>` : ""}
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <thead><tr>
+              <th style="text-align:left;">Mes</th>
+              ${activos.map((m) => `<th style="text-align:right;">${m.nombre}</th>`).join("")}
+              <th style="text-align:right;">Total</th>
+            </tr></thead>
+            <tbody>${filas.map(fila).join("")}</tbody>
+          </table>
+        </div>`;
+    };
+
+    cont.innerHTML =
+      tabla(cerrados, "Meses cerrados", "Esto es lo facturado de verdad.") +
+      tabla(enCurso ? [enCurso] : [], "Mes en curso", "Va a mitad de camino, todavía sube.") +
+      tabla(futuros, "Ya agendado a futuro", "Reservas confirmadas que aún no ocurren. No es facturación.");
+  } catch (e) {
+    cont.innerHTML = "Error: " + e.message;
   }
 }
 
