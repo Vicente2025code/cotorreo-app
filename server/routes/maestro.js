@@ -10,6 +10,7 @@
 const express = require("express");
 const { TABLES, list, create, update, get, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
+const { validarFechasCR, validarRangoHorario } = require("../horario");
 const { withMutex } = require("../mutex");
 const { generarReservasParaRecurrente, borrarReservasFuturasDeRecurrente } = require("./lili");
 
@@ -90,6 +91,10 @@ router.post("/mi-reserva", requireAuth(["maestro"]), async (req, res) => {
 
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+    // FUERA DE HORARIO
+    const fueraDeHorario = validarFechasCR(startCR, endCR);
+    if (fueraDeHorario) return res.status(400).json({ error: fueraDeHorario });
 
     // BLOQUEO ANTI-PASADO — no permitir reservas para horas que ya pasaron
     if (startCR.getTime() <= Date.now()) {
@@ -264,8 +269,11 @@ router.post("/mi-recurrente", requireAuth(["maestro"]), async (req, res) => {
     if (!cancha || !diaSemana || !horaInicio || !horaFin || !fechaInicio || !fechaFin) {
       return res.status(400).json({ error: "Faltan datos básicos" });
     }
-    if (horaFin <= horaInicio) {
-      return res.status(400).json({ error: "La hora fin debe ser posterior a la hora inicio" });
+    // Una recurrente mal armada no crea una reserva fuera de horario: crea
+    // decenas, una por semana, hasta la fecha fin.
+    const fueraDeHorario = validarRangoHorario(horaInicio, horaFin);
+    if (fueraDeHorario) {
+      return res.status(400).json({ error: fueraDeHorario });
     }
     const m = await get(TABLES.Maestros, req.user.recordId);
     const referencia = `Recurrente · ${m.fields.Nombre} · ${diaSemana} ${horaInicio}–${horaFin}`;
