@@ -8,6 +8,7 @@
  */
 
 const express = require("express");
+const { validarFechasCR } = require("../horario");
 const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente } = require("../airtable");
 const { withMutex } = require("../mutex");
 
@@ -282,6 +283,11 @@ router.post("/reservas/alpadel", async (req, res) => {
 
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+    // FUERA DE HORARIO — la app aceptaba 21:30 a 22:30 porque nadie miraba el cierre.
+    const fueraDeHorario = validarFechasCR(startCR, endCR);
+    if (fueraDeHorario) return res.status(400).json({ error: fueraDeHorario });
+
     const telefonoNorm = normalizeTelefono(telefono);
 
     // MUTEX POR CLAVE — la clave describe la reserva única. Requests
