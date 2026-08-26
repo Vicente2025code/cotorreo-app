@@ -17,6 +17,7 @@
  */
 
 const express = require("express");
+const { validarFechasCR, validarRangoHorario } = require("../horario");
 const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
 const { withMutex } = require("../mutex");
@@ -217,6 +218,13 @@ router.post(
 
       const startCR = new Date(`${fecha}T${hora}:00-06:00`);
       const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+      // FUERA DE HORARIO — sin `force`, igual que el anti-pasado: el operativo
+      // puede registrar algo excepcional, pero tiene que ser deliberado.
+      if (!req.body.force) {
+        const fueraDeHorario = validarFechasCR(startCR, endCR);
+        if (fueraDeHorario) return res.status(400).json({ error: fueraDeHorario });
+      }
 
       // BLOQUEO ANTI-PASADO — no permitir reservas para horas que ya pasaron.
       // El operativo puede forzar con `force: true` si está registrando una reserva pasada legítima.
