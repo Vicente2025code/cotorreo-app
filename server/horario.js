@@ -48,6 +48,13 @@ function validarRangoHorario(horaInicio, horaFin) {
  * Las fechas vienen en UTC; el horario se juzga en hora Costa Rica (UTC-6).
  */
 function validarFechasCR(startCR, endCR) {
+  // Una fecha invalida (mes 13, hora basura, duracion NaN) produce un Date
+  // invalido, y toISOString() sobre eso LANZA RangeError. Sin esta guarda, un
+  // dato malformado devolvia 500 en vez de un mensaje entendible.
+  const invalida = (d) => !(d instanceof Date) || Number.isNaN(d.getTime());
+  if (invalida(startCR) || invalida(endCR)) {
+    return "Fecha u hora invalida. Revisa los datos de la reserva.";
+  }
   const aHHMM = (d) => {
     const cr = new Date(d.getTime() - 6 * 3600 * 1000);
     return String(cr.getUTCHours()).padStart(2, "0") + ":" + String(cr.getUTCMinutes()).padStart(2, "0");
