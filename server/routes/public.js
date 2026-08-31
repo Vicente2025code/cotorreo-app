@@ -8,8 +8,16 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente, esClienteVetado } = require("../airtable");
+const crypto = require("crypto");
+const { TABLES, list, create, update, get, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente, esClienteVetado } = require("../airtable");
 const { withMutex } = require("../mutex");
+
+// Token único para el link mágico "mi-reserva" que va en la confirmación WATI.
+// 32 chars hex = 128 bits de entropía, imposible de adivinar. Se guarda en la
+// columna 'Token cliente' de la reserva.
+function genTokenReserva() {
+  return crypto.randomBytes(16).toString("hex");
+}
 
 const router = express.Router();
 
@@ -343,6 +351,7 @@ router.post("/reservas/alpadel", async (req, res) => {
         negocio: "Alpadel",
       });
 
+      const tokenCli = genTokenReserva();
       const reserva = await create(
         TABLES.ReservasAlpadel,
         {
@@ -358,6 +367,7 @@ router.post("/reservas/alpadel", async (req, res) => {
           Cliente: [cliente.id],
           Notas: notas || undefined,
           Referencia: `Alpadel · ${nombre} · ${startCR.toISOString()}`,
+          "Token cliente": tokenCli,
         },
         { typecast: true }
       );
@@ -367,6 +377,8 @@ router.post("/reservas/alpadel", async (req, res) => {
           id: reserva.id,
           referencia: reserva.fields.Referencia,
           precio: reserva.fields.Precio,
+          token: tokenCli,
+          link_gestionar: `https://reservas.grupocotorreo.com/mi-reserva.html?t=${tokenCli}`,
         },
       }};
     });
@@ -472,6 +484,7 @@ router.post("/reservas/cotorreo", async (req, res) => {
         negocio: "Plaza Cotorreo",
       });
 
+      const tokenCli = genTokenReserva();
       const reserva = await create(
         TABLES.ReservasCotorreo,
         {
@@ -487,17 +500,111 @@ router.post("/reservas/cotorreo", async (req, res) => {
           Cliente: [cliente.id],
           Notas: notas || undefined,
           Referencia: `Cotorreo · ${nombre} · ${startMesa.toISOString()}`,
+          "Token cliente": tokenCli,
         },
         { typecast: true }
       );
       return { code: 200, body: {
         ok: true,
-        reserva: { id: reserva.id, referencia: reserva.fields.Referencia },
+        reserva: {
+          id: reserva.id,
+          referencia: reserva.fields.Referencia,
+          token: tokenCli,
+          link_gestionar: `https://reservas.grupocotorreo.com/mi-reserva.html?t=${tokenCli}`,
+        },
       }};
     });
     return res.status(resultadoMesa.code).json(resultadoMesa.body);
   } catch (e) {
     console.error("POST reservas/cotorreo", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===========================
+// GET /api/mi-reserva/:token
+// Endpoint público sin auth: el cliente llega por el link mágico enviado en
+// la confirmación WATI. Devuelve datos de SU reserva (sin dato personal más
+// allá de lo que ya conoce) y si puede cancelar (2h antes de inicio).
+// ===========================
+async function buscarReservaPorToken(token) {
+  if (!token || !/^[a-f0-9]{16,64}$/i.test(token)) return null;
+  const esc = String(token).replace(/'/g, "\\'");
+  // Buscar en Alpadel primero
+  const rA = await list(TABLES.ReservasAlpadel, {
+    filterByFormula: `{Token cliente}='${esc}'`,
+    maxRecords: 1,
+  });
+  if (rA.records && rA.records.length) {
+    return { tipo: "alpadel", tabla: TABLES.ReservasAlpadel, rec: rA.records[0] };
+  }
+  // Cotorreo
+  const rC = await list(TABLES.ReservasCotorreo, {
+    filterByFormula: `{Token cliente}='${esc}'`,
+    maxRecords: 1,
+  });
+  if (rC.records && rC.records.length) {
+    return { tipo: "cotorreo", tabla: TABLES.ReservasCotorreo, rec: rC.records[0] };
+  }
+  return null;
+}
+
+router.get("/mi-reserva/:token", async (req, res) => {
+  try {
+    const hit = await buscarReservaPorToken(req.params.token);
+    if (!hit) return res.status(404).json({ error: "Reserva no encontrada" });
+    const f = hit.rec.fields;
+    const inicio = f["Fecha y hora inicio"] || f["Fecha y hora"];
+    const ahora = Date.now();
+    const inicioMs = inicio ? new Date(inicio).getTime() : 0;
+    const puedeCancelar =
+      f.Estado === "Confirmada" &&
+      inicioMs - ahora >= 2 * 60 * 60 * 1000; // 2h antes
+    res.json({
+      id: hit.rec.id,
+      tipo: hit.tipo,
+      estado: f.Estado,
+      nombre: f["Nombre cliente"],
+      inicio,
+      fin: f["Hora fin"] || null,
+      cancha: f.Cancha || null,
+      personas: f.Personas || null,
+      area: f.Area || null,
+      notas: f.Notas || null,
+      puede_cancelar: puedeCancelar,
+      motivo_no_cancelar: puedeCancelar ? null : (
+        f.Estado !== "Confirmada"
+          ? `Esta reserva ya está ${(f.Estado || "").toLowerCase()}.`
+          : "Solo se puede cancelar hasta 2h antes. Escribinos por WhatsApp."
+      ),
+    });
+  } catch (e) {
+    console.error("GET mi-reserva/:token", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/mi-reserva/:token/cancelar", async (req, res) => {
+  try {
+    const hit = await buscarReservaPorToken(req.params.token);
+    if (!hit) return res.status(404).json({ error: "Reserva no encontrada" });
+    const f = hit.rec.fields;
+    if (f.Estado !== "Confirmada") {
+      return res.status(400).json({ error: `Esta reserva ya está ${(f.Estado || "").toLowerCase()}.` });
+    }
+    const inicio = f["Fecha y hora inicio"] || f["Fecha y hora"];
+    const inicioMs = inicio ? new Date(inicio).getTime() : 0;
+    if (inicioMs - Date.now() < 2 * 60 * 60 * 1000) {
+      return res.status(400).json({ error: "Ya no podés cancelar solo — quedan menos de 2 horas. Escribinos por WhatsApp." });
+    }
+    const notasPrev = f.Notas || "";
+    await update(hit.tabla, hit.rec.id, {
+      Estado: "Cancelada",
+      Notas: (notasPrev + `\n[Cancelada por cliente via link ${new Date().toISOString()}]`).trim(),
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("POST mi-reserva/:token/cancelar", e);
     res.status(500).json({ error: e.message });
   }
 });
