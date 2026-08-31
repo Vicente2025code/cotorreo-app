@@ -17,7 +17,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
+const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, esClienteVetado } = require("../airtable");
 const { requireAuth } = require("../auth");
 const { withMutex } = require("../mutex");
 const mantenimiento = require("../airtableMantenimiento");
@@ -215,6 +215,12 @@ router.post(
       if (!fecha || !hora || !duracion || !cancha)
         return res.status(400).json({ error: "Faltan datos básicos" });
 
+      // Cliente vetado — bloqueo total, incluso desde Lili/Salonero.
+      // Mensaje explícito al staff para que sepan por qué y consulten a Vicente.
+      if (telefono && await esClienteVetado(telefono)) {
+        return res.status(403).json({ error: "⚠ Cliente vetado. Consultá con Vicente antes de crear esta reserva." });
+      }
+
       const startCR = new Date(`${fecha}T${hora}:00-06:00`);
       const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
 
@@ -337,6 +343,11 @@ router.post(
 
       if (!nombre || !telefono || !fechaHora || !personas)
         return res.status(400).json({ error: "Faltan datos" });
+
+      // Cliente vetado — bloqueo total, incluso desde staff
+      if (await esClienteVetado(telefono)) {
+        return res.status(403).json({ error: "⚠ Cliente vetado. Consultá con Vicente antes de crear esta reserva." });
+      }
 
       const cliente = clienteId
         ? await get(TABLES.Clientes, clienteId)

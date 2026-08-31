@@ -8,7 +8,7 @@
  */
 
 const express = require("express");
-const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente } = require("../airtable");
+const { TABLES, list, create, update, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente, esClienteVetado } = require("../airtable");
 const { withMutex } = require("../mutex");
 
 const router = express.Router();
@@ -259,6 +259,11 @@ router.post("/reservas/alpadel", async (req, res) => {
       notas,
     } = req.body;
 
+    // Cliente vetado — rechazo silencioso con mensaje genérico para no dar pista
+    if (telefono && await esClienteVetado(telefono)) {
+      return res.status(403).json({ error: "No pudimos procesar tu reserva. Por favor contactanos por WhatsApp." });
+    }
+
     const faltan = [];
     if (!nombre) faltan.push("nombre");
     if (!telefono) faltan.push("telefono");
@@ -391,6 +396,11 @@ router.post("/reservas/cotorreo", async (req, res) => {
       area,
       notas,
     } = req.body;
+
+    // Cliente vetado — rechazo silencioso con mensaje genérico
+    if (telefono && await esClienteVetado(telefono)) {
+      return res.status(403).json({ error: "No pudimos procesar tu reserva. Por favor contactanos por WhatsApp." });
+    }
 
     // Blindaje anti-bypass: si la fecha solicitada cae en un día bloqueado
     // (env var COTORREO_FECHAS_BLOQUEADAS), rechazar 503 aunque intenten

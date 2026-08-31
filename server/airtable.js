@@ -152,6 +152,15 @@ async function findClienteByTelefono(telefono) {
   return found.records && found.records.length > 0 ? found.records[0] : null;
 }
 
+// Devuelve true si el cliente con ese teléfono tiene el checkbox Vetado=true
+// en la tabla Clientes. Se usa al inicio de cada endpoint de reserva para
+// rechazar antes de tocar cualquier otra cosa.
+async function esClienteVetado(telefono) {
+  const cliente = await findClienteByTelefono(telefono);
+  if (!cliente) return false;
+  return Boolean(cliente.fields && cliente.fields.Vetado);
+}
+
 async function upsertCliente({ nombre, telefono, email, cumpleanos, cumpleanosDia, cumpleanosMes, negocio }) {
   const phoneNormalized = normalizeTelefono(telefono);
   if (!phoneNormalized) throw new Error("Teléfono requerido");
@@ -289,4 +298,5 @@ module.exports = {
   parseFechaHoraCR,
   findAlpadelOverlap,
   findDuplicadoReciente,
+  esClienteVetado,
 };
