@@ -838,7 +838,30 @@
 
           <div class="form-group">
             <label class="form-label" for="alFecha">Fecha <span class="required">*</span></label>
-            <input type="date" class="input" id="alFecha" required>
+            <input type="date" class="input" id="alFecha" required onchange="if(document.getElementById('dispPanel').style.display==='block') cargarDisponibilidad()">
+          </div>
+
+          <div class="form-group">
+            <button type="button" id="dispToggleBtn" onclick="toggleDisponibilidad()" style="width:100%; padding:12px; background:#f5f0e8; border:1.5px solid #d4a056; border-radius:8px; color:#8B6914; font-weight:600; cursor:pointer; font-size:14px;">
+              📅 Ver qué está libre ese día
+            </button>
+            <div id="dispPanel" style="display:none; margin-top:12px; padding:12px; background:#faf7f2; border:1px solid #e8e2d6; border-radius:8px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <button type="button" onclick="cambiarDiaDisponibilidad(-1)" style="background:none; border:1px solid #d4a056; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:16px;">←</button>
+                <div id="dispFechaLabel" style="font-weight:600; color:#333; font-size:14px;">Cargando...</div>
+                <button type="button" onclick="cambiarDiaDisponibilidad(1)" style="background:none; border:1px solid #d4a056; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:16px;">→</button>
+              </div>
+              <div id="dispGrid" style="display:grid; grid-template-columns:60px 1fr 1fr; gap:2px; font-size:12px;">
+                <div style="font-weight:700; padding:6px 4px; text-align:center;"></div>
+                <div style="font-weight:700; padding:6px 4px; text-align:center; background:#e8e2d6; border-radius:4px;">Singles</div>
+                <div style="font-weight:700; padding:6px 4px; text-align:center; background:#e8e2d6; border-radius:4px;">Dobles</div>
+              </div>
+              <div style="margin-top:10px; font-size:11px; color:#666; display:flex; gap:12px; justify-content:center;">
+                <span><span style="display:inline-block; width:12px; height:12px; background:#e6f4ea; border:1px solid #2d8a47; vertical-align:middle;"></span> libre</span>
+                <span><span style="display:inline-block; width:12px; height:12px; background:#fce8e6; border:1px solid #c53030; vertical-align:middle;"></span> reservado</span>
+                <span style="color:#8B6914;">Tocá un slot libre para elegirlo</span>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
@@ -1170,6 +1193,86 @@ function selectTipo(tipo) {
   setTimeout(() => document.getElementById("telCheck").focus(), 100);
 }
 
+// ===== Panel de disponibilidad Alpadel =====
+// Muestra qué slots están ocupados (rojo) y libres (verde) por cancha, sin
+// revelar nombres. Consume /api/disponibilidad/alpadel?fecha=YYYY-MM-DD.
+function toggleDisponibilidad() {
+  const p = document.getElementById("dispPanel");
+  if (p.style.display === "none" || !p.style.display) {
+    p.style.display = "block";
+    cargarDisponibilidad();
+  } else {
+    p.style.display = "none";
+  }
+}
+
+function cambiarDiaDisponibilidad(delta) {
+  const inp = document.getElementById("alFecha");
+  const d = new Date((inp.value || new Date().toISOString().slice(0,10)) + "T12:00:00");
+  d.setDate(d.getDate() + delta);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  if (d < hoy) return; // no viajamos al pasado
+  inp.value = d.toISOString().slice(0,10);
+  cargarDisponibilidad();
+}
+
+async function cargarDisponibilidad() {
+  const fecha = document.getElementById("alFecha").value;
+  if (!fecha) return;
+  const grid = document.getElementById("dispGrid");
+  const label = document.getElementById("dispFechaLabel");
+  const d = new Date(fecha + "T12:00:00");
+  label.textContent = d.toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long" });
+  // Rebuild grid header
+  grid.innerHTML =
+    '<div style="font-weight:700; padding:6px 4px; text-align:center;"></div>' +
+    '<div style="font-weight:700; padding:6px 4px; text-align:center; background:#e8e2d6; border-radius:4px;">Singles</div>' +
+    '<div style="font-weight:700; padding:6px 4px; text-align:center; background:#e8e2d6; border-radius:4px;">Dobles</div>' +
+    '<div style="grid-column: span 3; text-align:center; padding:12px; color:#888;">Cargando…</div>';
+  try {
+    const r = await fetch(`/api/disponibilidad/alpadel?fecha=${fecha}`);
+    if (!r.ok) throw new Error("no");
+    const data = await r.json();
+    const ocSg = new Set(data.ocupados.Singles || []);
+    const ocDb = new Set(data.ocupados.Dobles || []);
+    // Grid: 7:00 → 21:30 en slots de 30 min
+    let html =
+      '<div style="font-weight:700; padding:6px 4px; text-align:center;"></div>' +
+      '<div style="font-weight:700; padding:6px 4px; text-align:center; background:#e8e2d6; border-radius:4px;">Singles</div>' +
+      '<div style="font-weight:700; padding:6px 4px; text-align:center; background:#e8e2d6; border-radius:4px;">Dobles</div>';
+    for (let h = 7; h <= 21; h++) {
+      for (const m of ["00","30"]) {
+        const hh = String(h).padStart(2,"0");
+        const slot = `${hh}:${m}`;
+        const lblH = h > 12 ? (h-12) : (h === 0 ? 12 : h);
+        const ampm = h >= 12 ? "PM" : "AM";
+        const lbl = `${lblH}:${m} ${ampm}`;
+        html += `<div style="padding:4px; text-align:center; color:#555; font-size:11px;">${lbl}</div>`;
+        for (const cancha of ["Singles","Dobles"]) {
+          const ocupado = (cancha === "Singles" ? ocSg : ocDb).has(slot);
+          const bg = ocupado ? "#fce8e6" : "#e6f4ea";
+          const border = ocupado ? "#c53030" : "#2d8a47";
+          const txt = ocupado ? "🔒" : "✓";
+          const cursor = ocupado ? "not-allowed" : "pointer";
+          const onclick = ocupado ? "" : `onclick="elegirSlot('${slot}','${cancha}')"`;
+          html += `<div ${onclick} style="padding:6px; text-align:center; background:${bg}; border:1px solid ${border}; border-radius:4px; cursor:${cursor}; font-size:14px;" title="${cancha} ${slot} ${ocupado?'reservado':'libre'}">${txt}</div>`;
+        }
+      }
+    }
+    grid.innerHTML = html;
+  } catch (e) {
+    grid.innerHTML += '<div style="grid-column: span 3; text-align:center; padding:12px; color:#c53030;">Error al cargar. Recargá la página.</div>';
+  }
+}
+
+function elegirSlot(hora, cancha) {
+  document.getElementById("alHora").value = hora;
+  document.getElementById("alCancha").value = cancha;
+  document.getElementById("dispPanel").style.display = "none";
+  // scroll a hora para que el usuario vea el cambio
+  document.getElementById("alHora").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 // Config del server — trae las fechas donde NO se aceptan reservas Cotorreo
 // (Día de la Madre, San Valentín, etc.). Los demás días funcionan normal.
 let appConfig = { cotorreoFechasBloqueadas: [], cotorreoMensaje: "" };
@@ -1276,6 +1379,9 @@ function prepararFormAlpadel() {
   const fechaInput = document.getElementById("alFecha");
   fechaInput.min = todayISO;
   if (!fechaInput.value) fechaInput.value = todayISO;
+  // Cerrar panel de disponibilidad al re-abrir el form
+  const p = document.getElementById("dispPanel");
+  if (p) p.style.display = "none";
 
   // Cliente existente → ocultar sección "Tus datos" y mostrar greeting
   if (state.clienteExistente) {
