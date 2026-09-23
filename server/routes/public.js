@@ -11,6 +11,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { TABLES, list, create, update, get, upsertCliente, findClienteByTelefono, buildCumpleanos, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, findDuplicadoReciente, esClienteVetado } = require("../airtable");
 const { withMutex } = require("../mutex");
+const { validarFechasCR } = require("../horario");
 
 // Token único para el link mágico "mi-reserva" que va en la confirmación WATI.
 // 32 chars hex = 128 bits de entropía, imposible de adivinar. Se guarda en la
@@ -307,6 +308,11 @@ router.post("/reservas/alpadel", async (req, res) => {
 
     const startCR = new Date(`${fecha}T${hora}:00-06:00`);
     const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+    // FUERA DE HORARIO — la app aceptaba 21:30 a 22:30 porque nadie miraba el cierre.
+    const fueraDeHorario = validarFechasCR(startCR, endCR);
+    if (fueraDeHorario) return res.status(400).json({ error: fueraDeHorario });
+
     const telefonoNorm = normalizeTelefono(telefono);
 
     // MUTEX POR CLAVE — la clave describe la reserva única. Requests
