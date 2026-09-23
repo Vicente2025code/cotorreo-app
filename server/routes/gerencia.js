@@ -202,4 +202,78 @@ router.get("/dashboard/no-shows", requireAuth(["gerencia"]), async (req, res) =>
   }
 });
 
+// ===========================
+// GET /api/dashboard/maestros-facturacion?meses=12
+// Cuánto factura cada maestro, mes por mes.
+//
+// SOLO GERENCIA a propósito: cada maestro ve únicamente lo suyo en su pestaña
+// "Mi mes" (/api/mi-facturacion). Acá se ve el de todos y comparado, que es
+// justamente lo que no deben ver entre ellos.
+//
+// Usa la MISMA regla que /api/mi-facturacion — Tipo de reserva = Maestro y
+// Estado Confirmada o Completada — para que los números cuadren con lo que
+// cada maestro ve en su propio panel.
+// ===========================
+router.get("/dashboard/maestros-facturacion", requireAuth(["gerencia"]), async (req, res) => {
+  try {
+    const meses = Math.min(Math.max(parseInt(req.query.meses, 10) || 12, 1), 24);
+
+    const [maestrosR, reservasR] = await Promise.all([
+      list(TABLES.Maestros, {}),
+      list(TABLES.ReservasAlpadel, {
+        filterByFormula:
+          "AND({Tipo de reserva}='Maestro', OR({Estado}='Confirmada', {Estado}='Completada'))",
+      }),
+    ]);
+
+    const nombres = {};
+    for (const m of maestrosR.records) nombres[m.id] = m.fields.Nombre || "(sin nombre)";
+
+    // El mes se calcula en hora Costa Rica, no en UTC: una clase de las 6pm del
+    // 31 cae en UTC al día 1 del mes siguiente y se contaría en el mes que no es.
+    const mesCR = (iso) =>
+      new Date(new Date(iso).getTime() - 6 * 3600 * 1000).toISOString().slice(0, 7);
+    const mesHoy = mesActual();
+
+    const porMes = {};
+    for (const r of reservasR.records) {
+      const fh = r.fields["Fecha y hora inicio"];
+      if (!fh) continue;
+      const mes = mesCR(fh);
+      for (const id of r.fields.Maestro || []) {
+        if (!nombres[id]) continue;
+        porMes[mes] = porMes[mes] || {};
+        porMes[mes][id] = porMes[mes][id] || { clases: 0, horas: 0, monto: 0 };
+        porMes[mes][id].clases += 1;
+        porMes[mes][id].horas += r.fields["Duracion horas"] || 0;
+        porMes[mes][id].monto += r.fields["Precio"] || 0;
+      }
+    }
+
+    const filas = Object.keys(porMes)
+      .sort()
+      .reverse()
+      .slice(0, meses)
+      .map((mes) => {
+        const detalle = porMes[mes];
+        return {
+          mes,
+          // Los meses posteriores al actual son reservas agendadas, NO facturado.
+          // Mezclarlos con lo cobrado da una cifra que no existe.
+          futuro: mes > mesHoy,
+          enCurso: mes === mesHoy,
+          total: Object.values(detalle).reduce((s, v) => s + v.monto, 0),
+          maestros: Object.entries(detalle).map(([id, v]) => ({ id, nombre: nombres[id], ...v })),
+        };
+      });
+
+    res.json({
+      maestros: Object.entries(nombres).map(([id, nombre]) => ({ id, nombre })),
+      meses: filas,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
