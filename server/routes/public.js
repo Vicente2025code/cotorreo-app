@@ -74,8 +74,11 @@ router.get("/disponibilidad/alpadel", async (req, res) => {
       return res.status(400).json({ error: "Falta o mal formato de fecha (YYYY-MM-DD)" });
     }
 
-    const inicio = `${fecha}T00:00:00.000Z`;
-    const fin = `${fecha}T23:59:59.999Z`;
+    // La ventana es en hora Costa Rica, no UTC. Con `T00:00:00.000Z` el rango
+    // iba de las 6pm del dia ANTERIOR a las 5:59pm del dia pedido, y las
+    // reservas de la noche quedaban fuera de la consulta.
+    const inicio = `${fecha}T00:00:00-06:00`;
+    const fin = `${fecha}T23:59:59-06:00`;
 
     const formula = `AND(
       IS_AFTER({Fecha y hora inicio}, '${inicio}'),
@@ -97,9 +100,14 @@ router.get("/disponibilidad/alpadel", async (req, res) => {
       // Marcar cada slot de 30 min ocupado
       let cur = new Date(ini);
       while (cur < finR) {
-        const h = String(cur.getUTCHours() - 6).padStart(2, "0"); // UTC-6 CR
-        const m = String(cur.getUTCMinutes()).padStart(2, "0");
-        if (h >= "00" && h <= "23") ocupados[cancha].add(`${h}:${m}`);
+        // Convertir a hora CR ANTES de leer la hora. Antes se hacia
+        // `getUTCHours() - 6`: para las 18:00 CR (00:00 UTC del dia siguiente)
+        // daba -6, y `"-6" >= "00"` es falso en comparacion de strings, asi que
+        // todo lo de las 6pm en adelante se descartaba y la cancha salia libre.
+        const cr = new Date(cur.getTime() - 6 * 3600 * 1000);
+        const h = String(cr.getUTCHours()).padStart(2, "0");
+        const m = String(cr.getUTCMinutes()).padStart(2, "0");
+        ocupados[cancha].add(`${h}:${m}`);
         cur = new Date(cur.getTime() + 30 * 60 * 1000);
       }
     }
@@ -129,8 +137,9 @@ router.get("/disponibilidad/cotorreo", async (req, res) => {
       return res.status(400).json({ error: "Falta o mal formato de fecha" });
     }
 
-    const inicio = `${fecha}T00:00:00.000Z`;
-    const fin = `${fecha}T23:59:59.999Z`;
+    // Misma correccion que en alpadel: la ventana va en hora Costa Rica.
+    const inicio = `${fecha}T00:00:00-06:00`;
+    const fin = `${fecha}T23:59:59-06:00`;
 
     const formula = `AND(
       IS_AFTER({Fecha y hora}, '${inicio}'),
@@ -146,8 +155,11 @@ router.get("/disponibilidad/cotorreo", async (req, res) => {
       const f = r.fields;
       const personas = f["Personas"] || 0;
       totalPersonas += personas;
-      const d = new Date(f["Fecha y hora"]);
-      const h = String(d.getUTCHours() - 6).padStart(2, "0");
+      // Mismo bug que en alpadel: aca no habia guard, asi que una reserva de
+      // las 7pm generaba la clave "-5:00", que no coincide con ninguna hora del
+      // grid y desaparecia igual. La cena es justamente la hora pico.
+      const d = new Date(new Date(f["Fecha y hora"]).getTime() - 6 * 3600 * 1000);
+      const h = String(d.getUTCHours()).padStart(2, "0");
       const m = String(d.getUTCMinutes()).padStart(2, "0");
       const slot = `${h}:${m}`;
       porHora[slot] = (porHora[slot] || 0) + personas;
