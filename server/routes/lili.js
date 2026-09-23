@@ -17,7 +17,8 @@
  */
 
 const express = require("express");
-const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap, esClienteVetado } = require("../airtable");
+const { validarFechasCR, validarRangoHorario } = require("../horario");
+const { TABLES, list, get, create, update, upsertCliente, findClienteByTelefono, normalizeTelefono, parseFechaHoraCR, findAlpadelOverlap } = require("../airtable");
 const { requireAuth } = require("../auth");
 const { withMutex } = require("../mutex");
 const mantenimiento = require("../airtableMantenimiento");
@@ -215,14 +216,15 @@ router.post(
       if (!fecha || !hora || !duracion || !cancha)
         return res.status(400).json({ error: "Faltan datos básicos" });
 
-      // Cliente vetado — bloqueo total, incluso desde Lili/Salonero.
-      // Mensaje explícito al staff para que sepan por qué y consulten a Vicente.
-      if (telefono && await esClienteVetado(telefono)) {
-        return res.status(403).json({ error: "⚠ Cliente vetado. Consultá con Vicente antes de crear esta reserva." });
-      }
-
       const startCR = new Date(`${fecha}T${hora}:00-06:00`);
       const endCR = new Date(startCR.getTime() + duracion * 3600 * 1000);
+
+      // FUERA DE HORARIO — sin `force`, igual que el anti-pasado: el operativo
+      // puede registrar algo excepcional, pero tiene que ser deliberado.
+      if (!req.body.force) {
+        const fueraDeHorario = validarFechasCR(startCR, endCR);
+        if (fueraDeHorario) return res.status(400).json({ error: fueraDeHorario });
+      }
 
       // BLOQUEO ANTI-PASADO — no permitir reservas para horas que ya pasaron.
       // El operativo puede forzar con `force: true` si está registrando una reserva pasada legítima.
@@ -343,11 +345,6 @@ router.post(
 
       if (!nombre || !telefono || !fechaHora || !personas)
         return res.status(400).json({ error: "Faltan datos" });
-
-      // Cliente vetado — bloqueo total, incluso desde staff
-      if (await esClienteVetado(telefono)) {
-        return res.status(403).json({ error: "⚠ Cliente vetado. Consultá con Vicente antes de crear esta reserva." });
-      }
 
       const cliente = clienteId
         ? await get(TABLES.Clientes, clienteId)
