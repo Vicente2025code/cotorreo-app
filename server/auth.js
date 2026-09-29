@@ -36,6 +36,38 @@ function loadPins() {
 const PINS = loadPins();
 console.log(`🔑 ${Object.keys(PINS).length} PINs cargados`);
 
+// === Sesiones revocadas ===
+// Un JWT no se puede "borrar": una vez firmado vive hasta que expira, y para
+// maestros eso son 365 días. Cambiar el PIN NO lo mata — solo impide sacar uno
+// nuevo. Así que para sacar a alguien antes de tiempo hace falta un corte:
+// cualquier token de ese recordId firmado ANTES del corte deja de servir.
+//
+// Formato de la variable (varios cortes separados por coma):
+//   REVOCAR_SESIONES="recIMWWnJGBnN8RMd:2026-09-29T18:00:00Z"
+//
+// El corte va junto con cambiar el PIN de esa persona. Sin el cambio de PIN,
+// quien tenga el link viejo simplemente vuelve a entrar y saca token nuevo.
+function loadRevocaciones() {
+  const out = {};
+  for (const par of (process.env.REVOCAR_SESIONES || "").split(",")) {
+    const trozos = par.trim().split(":");
+    const recordId = trozos.shift();
+    if (!recordId || !trozos.length) continue;
+    const corte = Date.parse(trozos.join(":")); // la fecha ISO trae ":" adentro
+    if (Number.isNaN(corte)) {
+      console.warn(`[AUTH] REVOCAR_SESIONES: fecha inválida para ${recordId}, se ignora`);
+      continue;
+    }
+    out[recordId] = Math.floor(corte / 1000); // el `iat` del JWT va en segundos
+  }
+  return out;
+}
+
+const REVOCACIONES = loadRevocaciones();
+for (const [rec, corte] of Object.entries(REVOCACIONES)) {
+  console.log(`🚫 sesiones de ${rec} anteriores a ${new Date(corte * 1000).toISOString()} revocadas`);
+}
+
 // === Rate limit en memoria (suficiente para esta escala) ===
 const attempts = new Map(); // ip → { count, blockedUntil }
 const MAX_ATTEMPTS = 5;
@@ -114,6 +146,15 @@ function requireAuth(allowedRoles = null) {
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
+
+      // Sesión cortada a mano: el token es válido pero ya no lo aceptamos.
+      // 401 y no 403 a propósito — el front hace logout() y manda a la
+      // portada, que es justo lo que queremos que le pase.
+      const corte = REVOCACIONES[decoded.recordId];
+      if (corte && (decoded.iat || 0) < corte) {
+        return res.status(401).json({ error: "Tu sesión terminó. Volvé a entrar con tu link." });
+      }
+
       if (allowedRoles && !allowedRoles.includes(decoded.rol)) {
         return res
           .status(403)
