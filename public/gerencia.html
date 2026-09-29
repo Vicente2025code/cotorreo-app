@@ -58,7 +58,7 @@
   <div class="tab-content" id="tab-maestros">
     <div class="card">
       <h3>🎾 Facturación de maestros por mes</h3>
-      <p class="subtitle" style="margin:4px 0 12px;">Privado: cada maestro solo ve lo suyo en su propio panel.</p>
+      <p class="hint" style="margin:4px 0 12px;">Privado: cada maestro solo ve lo suyo en su propio panel.</p>
       <div id="maestros-list" class="loading">Cargando</div>
     </div>
   </div>
@@ -163,64 +163,78 @@ async function loadNoshows() {
 
 async function loadMaestros() {
   const cont = document.getElementById("maestros-list");
-  try {
-    const r = await api("GET", "/api/dashboard/maestros-facturacion?meses=12");
-    if (!r.meses.length) {
-      cont.innerHTML = "<em>Todavía no hay clases de maestros registradas.</em>";
-      return;
-    }
-    const MES_NOMBRE = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    const etiqueta = (m) => {
-      const [y, mm] = m.split("-").map(Number);
-      return MES_NOMBRE[mm] + " " + y;
-    };
-    // Solo las columnas de maestros que facturaron algo en el rango mostrado,
-    // para no arrastrar columnas vacías de gente que ya no da clases.
-    const activos = r.maestros.filter((m) =>
-      r.meses.some((f) => f.maestros.some((x) => x.id === m.id && x.monto > 0))
-    );
-
-    const cerrados = r.meses.filter((f) => !f.futuro && !f.enCurso);
-    const enCurso = r.meses.find((f) => f.enCurso);
-    const futuros = r.meses.filter((f) => f.futuro);
-
-    const fila = (f) => {
-      const celdas = activos
-        .map((m) => {
-          const v = f.maestros.find((x) => x.id === m.id);
-          return v && v.monto
-            ? `<td style="text-align:right;">${fmtMonto(v.monto)}<br><small style="opacity:.6">${v.clases} clases</small></td>`
-            : `<td style="text-align:right;opacity:.35;">—</td>`;
-        })
-        .join("");
-      return `<tr><td><strong>${etiqueta(f.mes)}</strong></td>${celdas}<td style="text-align:right;"><strong>${fmtMonto(f.total)}</strong></td></tr>`;
-    };
-
-    const tabla = (filas, titulo, nota) => {
-      if (!filas.length) return "";
-      return `
-        <h4 style="margin:16px 0 6px;">${titulo}</h4>
-        ${nota ? `<p class="subtitle" style="margin:0 0 8px;">${nota}</p>` : ""}
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:14px;">
-            <thead><tr>
-              <th style="text-align:left;">Mes</th>
-              ${activos.map((m) => `<th style="text-align:right;">${m.nombre}</th>`).join("")}
-              <th style="text-align:right;">Total</th>
-            </tr></thead>
-            <tbody>${filas.map(fila).join("")}</tbody>
-          </table>
-        </div>`;
-    };
-
-    cont.innerHTML =
-      tabla(cerrados, "Meses cerrados", "Esto es lo facturado de verdad.") +
-      tabla(enCurso ? [enCurso] : [], "Mes en curso", "Va a mitad de camino, todavía sube.") +
-      tabla(futuros, "Ya agendado a futuro", "Reservas confirmadas que aún no ocurren. No es facturación.");
-  } catch (e) {
-    cont.innerHTML = "Error: " + e.message;
+  let r;
+  try { r = await api("GET", "/api/dashboard/maestros-facturacion?meses=12"); }
+  catch (e) { cont.innerHTML = "Error: " + e.message; return; }
+  if (!r.meses || !r.meses.length) {
+    cont.innerHTML = "<em>Todavía no hay clases de maestros registradas.</em>";
+    return;
   }
+  const MES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const etiqueta = (m) => { const [y, mm] = m.split("-").map(Number); return MES[mm] + " " + y; };
+
+  // Un mes sin plata no aporta nada y solo alarga el scroll.
+  const meses = r.meses.filter((m) => m.total > 0);
+
+  const estado = (m) =>
+    m.futuro
+      ? { txt: "Agendado", bg: "var(--color-accent-warn-bg)", fg: "var(--ink)" }
+      : m.enCurso
+      ? { txt: "En curso", bg: "var(--color-accent-info-bg)", fg: "var(--color-accent-info)" }
+      : { txt: "Cerrado", bg: "var(--color-success-bg)", fg: "var(--color-success)" };
+
+  const bloque = (m) => {
+    const e = estado(m);
+    // De mayor a menor: lo primero que se quiere saber es quién factura más.
+    const filas = m.maestros
+      .filter((x) => x.monto > 0)
+      .sort((a, b) => b.monto - a.monto)
+      .map(
+        (x) => `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid var(--border-subtle);">
+          <div style="min-width:0;">
+            <div style="font-weight:600;color:var(--ink);">${x.nombre}</div>
+            <div style="font-size:12px;color:var(--ink-soft);">${x.clases} clase${x.clases === 1 ? "" : "s"} · ${x.horas} h</div>
+          </div>
+          <div style="font-weight:700;white-space:nowrap;">${fmtMonto(x.monto)}</div>
+        </div>`
+      )
+      .join("");
+
+    return `
+      <div class="card" style="padding:14px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="font-weight:700;color:var(--primary);font-size:15px;">${etiqueta(m.mes)}</div>
+          <span class="badge" style="background:${e.bg};color:${e.fg};">${e.txt}</span>
+        </div>
+        <div style="font-size:24px;font-weight:800;color:var(--ink);margin:6px 0 2px;">${fmtMonto(m.total)}</div>
+        ${filas}
+      </div>`;
+  };
+
+  // `meses` viene del más nuevo al más viejo.
+  const enCurso = meses.filter((m) => m.enCurso);
+  const cerrados = meses.filter((m) => !m.futuro && !m.enCurso);
+  // Los futuros al revés: lo que viene la semana que entra importa más que
+  // diciembre. Al venir en orden descendente, hay que invertirlos.
+  const futuros = meses.filter((m) => m.futuro).slice().reverse();
+
+  const seccion = (lista, titulo, nota) =>
+    lista.length
+      ? `<h4 style="margin:16px 0 4px;color:var(--ink);font-size:14px;">${titulo}</h4>
+         <p class="hint" style="margin:0 0 8px;">${nota}</p>
+         ${lista.map(bloque).join("")}`
+      : "";
+
+  cont.className = "";
+  // El mes en curso va PRIMERO: es lo que se abre a mirar. Antes quedaba
+  // debajo de todos los cerrados, a tres pantallas de scroll en el teléfono.
+  cont.innerHTML =
+    seccion(enCurso, "Mes en curso", "Va a mitad de camino, todavía sube.") +
+    seccion(cerrados, "Meses cerrados", "Facturación real, ya ocurrió.") +
+    seccion(futuros, "Ya agendado", "Confirmado pero aún no ocurre. No es facturación.");
 }
+
 
 loadKPIs();
 </script>
