@@ -1100,6 +1100,7 @@ const state = {
   telefono: null,            // formato 506XXXXXXXX
   clienteExistente: null,    // { nombre } | null
   reservaConfirmada: null,   // datos devueltos por backend
+  refNombre: null,           // si vino de ?ref=XXX, nombre del maestro referidor
 };
 
 // ============================================
@@ -1404,13 +1405,22 @@ function showAlFeedback(type, msg) {
 async function submitAlpadel(e) {
   if (e) e.preventDefault();
 
+  // Si vino de un link de referidor (?ref=XXX) prepend al notas para que
+  // quede trazable en Airtable quién mandó al cliente. El Tipo queda Regular
+  // (el default del endpoint público) y por eso aplica tarifa pública,
+  // aunque haya venido referido por un maestro.
+  const notasBase = document.getElementById("alNotas").value || "";
+  const notasFinal = state.refNombre
+    ? `[Referido por ${state.refNombre}] ${notasBase}`.trim()
+    : notasBase;
+
   const body = {
     telefono: state.telefono,
     fecha: document.getElementById("alFecha").value,
     hora: document.getElementById("alHora").value,
     duracion: parseFloat(document.getElementById("alDuracion").value),
     cancha: document.getElementById("alCancha").value,
-    notas: document.getElementById("alNotas").value,
+    notas: notasFinal,
   };
 
   if (state.clienteExistente) {
@@ -1740,7 +1750,29 @@ horaSel.appendChild(last);
 // Deep-link desde el bot: ?tipo=alpadel&tel=50688887777
 (function initFromQueryParams() {
   const params = new URLSearchParams(window.location.search);
-  const rawTipo = (params.get("tipo") || "").toLowerCase();
+
+  // ?ref=<slug> → link que un maestro comparte con sus clientes para que
+  // reserven ellos mismos a tarifa pública (Tipo=Regular). El slug se mapea
+  // a un nombre legible que va en el banner y en las notas de la reserva.
+  const refMap = {
+    "vital-sport": "Centro Vital Sport",
+    "vitalsport": "Centro Vital Sport",
+    "juan-bao": "Juan Bao",
+    "juanbao": "Juan Bao",
+    "frank": "Francisco Sánchez",
+  };
+  const refSlug = (params.get("ref") || "").toLowerCase().trim();
+  if (refSlug && refMap[refSlug]) {
+    state.refNombre = refMap[refSlug];
+    // Banner informativo arriba del header
+    const bannerHTML = `<div style="position:relative; margin:0; padding:12px 16px; background:#fcf2e1; border-bottom:2px solid #d4a056; color:#8B6914; text-align:center; font-size:14px; font-weight:600;">
+      Estás reservando a través de <strong>${state.refNombre}</strong>
+    </div>`;
+    const app = document.getElementById("app");
+    if (app) app.insertAdjacentHTML("afterbegin", bannerHTML);
+  }
+
+  const rawTipo = (params.get("tipo") || (refSlug ? "alpadel" : "")).toLowerCase();
   const tipoMap = {
     alpadel: "alpadel", cancha: "alpadel", padel: "alpadel",
     cotorreo: "cotorreo", mesa: "cotorreo", restaurante: "cotorreo"
